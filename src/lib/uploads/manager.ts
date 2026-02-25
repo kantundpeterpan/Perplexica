@@ -6,6 +6,7 @@ import { splitText } from "../utils/splitText";
 import { PDFParse } from 'pdf-parse';
 import { CanvasFactory } from 'pdf-parse/worker';
 import officeParser from 'officeparser'
+import { getVectorStore } from "./vectorStoreFactory";
 
 const supportedMimeTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'] as const
 
@@ -203,6 +204,24 @@ class UploadManager {
             }
 
             UploadManager.addNewRecordedFile(fileRecord);
+
+            // Upsert into the configured external vector store (no-op for local).
+            const provider = (process.env.VECTOR_STORE_PROVIDER ?? 'local').toLowerCase();
+            if (provider !== 'local') {
+                const chunks = UploadManager.getFileChunks(fileId);
+                const vectorStore = await getVectorStore(this.embeddingModel);
+                await vectorStore.upsertFileChunks(fileId, file.name, chunks);
+
+                if (process.env.VECTOR_STORE_DUAL_WRITE !== 'true') {
+                    // Remove the .content.json file to save disk space when using
+                    // an external store and dual-write is not requested.
+                    try {
+                        fs.unlinkSync(contentFilePath);
+                    } catch (_) {
+                        // Ignore – file may not exist.
+                    }
+                }
+            }
 
             processedFiles.push({
                 fileExtension: fileExtension || '',

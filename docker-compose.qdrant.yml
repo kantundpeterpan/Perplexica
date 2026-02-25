@@ -1,0 +1,38 @@
+services:
+  perplexica:
+    image: itzcrazykns1337/perplexica:latest
+    build:
+      context: .
+    ports:
+      - '3000:3000'
+    environment:
+      - VECTOR_STORE_PROVIDER=qdrant
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION=perplexica_uploads
+      # Optional: set QDRANT_API_KEY for Qdrant Cloud
+    volumes:
+      - data:/home/perplexica/data
+    restart: unless-stopped
+    depends_on:
+      qdrant:
+        condition: service_healthy
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - '6333:6333'
+      - '6334:6334'
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:6333/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  data:
+    name: 'perplexica-data'
+  qdrant_data:
+    name: 'perplexica-qdrant-data'

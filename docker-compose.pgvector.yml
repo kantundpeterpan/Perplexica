@@ -1,0 +1,41 @@
+services:
+  perplexica:
+    image: itzcrazykns1337/perplexica:latest
+    build:
+      context: .
+    ports:
+      - '3000:3000'
+    environment:
+      - VECTOR_STORE_PROVIDER=pgvector
+      - PGVECTOR_URL=postgresql://perplexica:perplexica@pgvector:5432/perplexica
+      - PGVECTOR_TABLE=perplexica_uploads
+      - PGVECTOR_SCHEMA=public
+    volumes:
+      - data:/home/perplexica/data
+    restart: unless-stopped
+    depends_on:
+      pgvector:
+        condition: service_healthy
+
+  pgvector:
+    image: pgvector/pgvector:pg17
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_USER=perplexica
+      - POSTGRES_PASSWORD=perplexica
+      - POSTGRES_DB=perplexica
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U perplexica -d perplexica']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  data:
+    name: 'perplexica-data'
+  pgvector_data:
+    name: 'perplexica-pgvector-data'
