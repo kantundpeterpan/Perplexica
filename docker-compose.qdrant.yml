@@ -1,8 +1,8 @@
 services:
   perplexica:
-    image: itzcrazykns1337/perplexica:latest
     build:
       context: .
+      dockerfile: Dockerfile.multistage
     ports:
       - '3000:3000'
     environment:
@@ -13,9 +13,10 @@ services:
     volumes:
       - data:/home/perplexica/data
     restart: unless-stopped
-    depends_on:
-      qdrant:
-        condition: service_healthy
+    # depends_on:
+    #   qdrant:
+    #     condition: service_healthy
+    
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -29,6 +30,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

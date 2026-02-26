@@ -4,6 +4,7 @@ import { Chunk } from '../types';
 import { VectorStore } from './vectorStore';
 import PerplexicaEmbeddingsAdapter from './langchainEmbeddingsAdapter';
 import BaseEmbedding from '../models/base/embedding';
+import { v5 as uuidv5 } from 'uuid';
 
 /**
  * Qdrant-backed vector store implementation.
@@ -15,6 +16,9 @@ import BaseEmbedding from '../models/base/embedding';
  * Optional:
  *   QDRANT_API_KEY    – API key for Qdrant Cloud
  */
+
+const UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // DNS namespace for deterministic v5 IDs
+
 class LangChainQdrantVectorStore implements VectorStore {
   private readonly url: string;
   private readonly collection: string;
@@ -52,7 +56,8 @@ class LangChainQdrantVectorStore implements VectorStore {
     });
 
     // Use deterministic IDs: fileId:chunkIndex
-    const ids = chunks.map((_, idx) => `${fileId}:${idx}`);
+    // const ids = chunks.map((_, idx) => `${fileId}:${idx}`);
+    const ids = chunks.map((_, idx) => uuidv5(`${fileId}:${idx}`, UUID_NAMESPACE));
 
     await store.addDocuments(docs, { ids });
   }

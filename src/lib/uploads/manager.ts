@@ -210,6 +210,7 @@ class UploadManager {
             if (provider !== 'local') {
                 const chunks = UploadManager.getFileChunks(fileId);
                 const vectorStore = await getVectorStore(this.embeddingModel);
+                console.log(`Upserting ${chunks.length} chunks for file ${fileId} into vector store...`);
                 await vectorStore.upsertFileChunks(fileId, file.name, chunks);
 
                 if (process.env.VECTOR_STORE_DUAL_WRITE !== 'true') {
