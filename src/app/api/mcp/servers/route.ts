@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import configManager from '@/lib/config';
-import { MCPServerTransport } from '@/lib/config/types';
+import { MCPServerTransport, MCPToolScope } from '@/lib/config/types';
 
 /* GET /api/mcp/servers - list all configured MCP servers */
 export const GET = async (_req: NextRequest) => {
@@ -19,10 +19,11 @@ export const GET = async (_req: NextRequest) => {
 export const POST = async (req: NextRequest) => {
   try {
     const body = await req.json();
-    const { name, transport, defaultScope } = body as {
+    const { name, transport, defaultScope, systemPromptSnippet } = body as {
       name: string;
       transport: MCPServerTransport;
-      defaultScope?: 'allow' | 'ask';
+      defaultScope?: MCPToolScope;
+      systemPromptSnippet?: string;
     };
 
     if (!name || !transport) {
@@ -36,6 +37,7 @@ export const POST = async (req: NextRequest) => {
       name,
       transport,
       defaultScope ?? 'allow',
+      systemPromptSnippet,
     );
 
     return NextResponse.json({ server }, { status: 201 });

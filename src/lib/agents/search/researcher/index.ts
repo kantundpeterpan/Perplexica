@@ -5,6 +5,7 @@ import SessionManager from '@/lib/session';
 import { Message, ReasoningResearchBlock } from '@/lib/types';
 import formatChatHistoryAsString from '@/lib/utils/formatHistory';
 import { ToolCall } from '@/lib/models/types';
+import configManager from '@/lib/config';
 
 class Researcher {
   async research(
@@ -20,6 +21,8 @@ class Researcher {
           : 25;
 
     await ActionRegistry.waitForReady();
+
+    const mcpSnippets = configManager.getActiveMCPPromptSnippets();
 
     const availableTools = ActionRegistry.getAvailableActionTools({
       classification: input.classification,
@@ -65,6 +68,7 @@ class Researcher {
         i,
         maxIteration,
         input.config.fileIds,
+        mcpSnippets,
       );
 
       const actionStream = input.config.llm.streamText({

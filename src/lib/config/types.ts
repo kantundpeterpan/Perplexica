@@ -60,7 +60,7 @@ type ConfigModelProvider = {
   hash: string;
 };
 
-type MCPToolScope = 'allow' | 'ask';
+type MCPToolScope = 'allow' | 'ask' | 'disabled';
 
 type MCPToolOverride = {
   name: string;
@@ -88,6 +88,7 @@ type MCPServerConfig = {
   enabled: boolean;
   defaultScope: MCPToolScope;
   toolOverrides: MCPToolOverride[];
+  systemPromptSnippet?: string;
   transport: MCPServerTransport;
 };
 
