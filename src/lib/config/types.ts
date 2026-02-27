@@ -67,12 +67,32 @@ type MCPToolOverride = {
   scope: MCPToolScope;
 };
 
-type MCPConfig = {
+type MCPServerTransportStdio = {
+  type: 'stdio';
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+};
+
+type MCPServerTransportHttp = {
+  type: 'http';
+  url: string;
+  headers?: Record<string, string>;
+};
+
+type MCPServerTransport = MCPServerTransportStdio | MCPServerTransportHttp;
+
+type MCPServerConfig = {
+  id: string;
+  name: string;
   enabled: boolean;
-  baseURL: string;
-  apiKey?: string;
   defaultScope: MCPToolScope;
   toolOverrides: MCPToolOverride[];
+  transport: MCPServerTransport;
+};
+
+type MCPConfig = {
+  servers: MCPServerConfig[];
 };
 
 type Config = {
@@ -124,6 +144,10 @@ export type {
   TextareaUIConfigField,
   SwitchUIConfigField,
   MCPConfig,
+  MCPServerConfig,
+  MCPServerTransport,
+  MCPServerTransportStdio,
+  MCPServerTransportHttp,
   MCPToolScope,
   MCPToolOverride,
 };

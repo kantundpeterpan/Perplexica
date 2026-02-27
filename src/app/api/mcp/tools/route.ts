@@ -1,17 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import configManager from '@/lib/config';
-import MCPProvider from '@/lib/mcp/provider';
+import MCPClient from '@/lib/mcp/provider';
+import { MCPServerConfig } from '@/lib/config/types';
 
 export const GET = async (_req: NextRequest) => {
   try {
     const mcpConfig = configManager.getConfig('mcp');
+    const servers: MCPServerConfig[] = mcpConfig?.servers ?? [];
+    const enabledServers = servers.filter((s: MCPServerConfig) => s.enabled);
 
-    if (!mcpConfig?.enabled || !mcpConfig?.baseURL) {
+    if (enabledServers.length === 0) {
       return NextResponse.json({ tools: [] });
     }
 
-    const provider = new MCPProvider(mcpConfig.baseURL, mcpConfig.apiKey);
-    const tools = await provider.listTools();
+    const results = await Promise.allSettled(
+      enabledServers.map(async (serverCfg: MCPServerConfig) => {
+        const client = new MCPClient(serverCfg);
+        const tools = await client.listTools();
+        return { server: serverCfg.name, tools };
+      }),
+    );
+
+    const tools = results
+      .filter((r) => r.status === 'fulfilled')
+      .flatMap((r) => (r as PromiseFulfilledResult<any>).value.tools);
 
     return NextResponse.json({ tools });
   } catch (err: any) {

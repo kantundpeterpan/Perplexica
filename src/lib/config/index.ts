@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'fs';
-import { Config, ConfigModelProvider, MCPConfig, UIConfigSections } from './types';
+import { Config, ConfigModelProvider, MCPServerConfig, MCPServerTransport, UIConfigSections } from './types';
 import { hashObj } from '../serverUtils';
 import { getModelProvidersUIConfigSection } from '../models/providers';
 
@@ -20,11 +20,7 @@ class ConfigManager {
       searxngURL: '',
     },
     mcp: {
-      enabled: false,
-      baseURL: '',
-      apiKey: '',
-      defaultScope: 'allow',
-      toolOverrides: [],
+      servers: [],
     },
   };
   uiConfigSections: UIConfigSections = {
@@ -121,53 +117,7 @@ class ConfigManager {
         env: 'SEARXNG_API_URL',
       },
     ],
-    mcp: [
-      {
-        name: 'Enable MCP',
-        key: 'enabled',
-        type: 'switch',
-        required: false,
-        description: 'Enable Model Context Protocol (MCP) tool integration.',
-        default: false,
-        scope: 'server',
-      },
-      {
-        name: 'MCP Base URL',
-        key: 'baseURL',
-        type: 'string',
-        required: false,
-        description: 'The base URL of your MCP server endpoint.',
-        placeholder: 'http://localhost:3001/mcp',
-        default: '',
-        scope: 'server',
-        env: 'MCP_BASE_URL',
-      },
-      {
-        name: 'MCP API Key',
-        key: 'apiKey',
-        type: 'password',
-        required: false,
-        description: 'Optional API key for authenticating with the MCP server.',
-        placeholder: 'MCP API Key',
-        default: '',
-        scope: 'server',
-        env: 'MCP_API_KEY',
-      },
-      {
-        name: 'Default Tool Scope',
-        key: 'defaultScope',
-        type: 'select',
-        required: false,
-        description:
-          'Default permission scope for MCP tools. "Allow" runs tools automatically; "Ask" requires user approval.',
-        default: 'allow',
-        options: [
-          { name: 'Allow (automatic)', value: 'allow' },
-          { name: 'Ask (require approval)', value: 'ask' },
-        ],
-        scope: 'server',
-      },
-    ],
+    mcp: [],
   };
 
   constructor() {
@@ -288,23 +238,10 @@ class ConfigManager {
       }
     });
 
-    /* mcp section */
-    if (!this.currentConfig.mcp) {
-      this.currentConfig.mcp = {
-        enabled: false,
-        baseURL: '',
-        apiKey: '',
-        defaultScope: 'allow',
-        toolOverrides: [],
-      };
+    /* mcp section - ensure the servers array exists (migrate from old flat config) */
+    if (!this.currentConfig.mcp || !Array.isArray(this.currentConfig.mcp.servers)) {
+      this.currentConfig.mcp = { servers: [] };
     }
-    this.uiConfigSections.mcp.forEach((f) => {
-      const mcpKey = f.key as keyof MCPConfig;
-      if (f.env && !this.currentConfig.mcp[mcpKey]) {
-        const envVal = process.env[f.env] ?? (f as any).default ?? '';
-        (this.currentConfig.mcp as Record<string, any>)[f.key] = envVal;
-      }
-    });
 
     this.saveConfig();
   }
@@ -433,6 +370,51 @@ class ConfigManager {
       );
     }
 
+    this.saveConfig();
+  }
+
+  public addMCPServer(
+    name: string,
+    transport: MCPServerTransport,
+    defaultScope: 'allow' | 'ask' = 'allow',
+  ): MCPServerConfig {
+    const server: MCPServerConfig = {
+      id: crypto.randomUUID(),
+      name,
+      enabled: true,
+      defaultScope,
+      toolOverrides: [],
+      transport,
+    };
+
+    this.currentConfig.mcp.servers.push(server);
+    this.saveConfig();
+
+    return server;
+  }
+
+  public updateMCPServer(
+    id: string,
+    updates: Partial<
+      Pick<
+        MCPServerConfig,
+        'name' | 'enabled' | 'defaultScope' | 'transport' | 'toolOverrides'
+      >
+    >,
+  ): MCPServerConfig {
+    const server = this.currentConfig.mcp.servers.find((s) => s.id === id);
+    if (!server) throw new Error(`MCP server ${id} not found`);
+
+    Object.assign(server, updates);
+    this.saveConfig();
+
+    return server;
+  }
+
+  public removeMCPServer(id: string) {
+    this.currentConfig.mcp.servers = this.currentConfig.mcp.servers.filter(
+      (s) => s.id !== id,
+    );
     this.saveConfig();
   }
 

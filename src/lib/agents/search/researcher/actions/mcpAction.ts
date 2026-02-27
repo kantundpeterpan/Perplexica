@@ -1,8 +1,9 @@
 import z from 'zod';
 import { ResearchAction } from '../../types';
 import { Chunk } from '@/lib/types';
-import MCPProvider, { MCPTool } from '@/lib/mcp/provider';
+import MCPClient, { MCPTool } from '@/lib/mcp/provider';
 import configManager from '@/lib/config';
+import { MCPServerConfig } from '@/lib/config/types';
 
 const buildSchema = (tool: MCPTool) => {
   const properties: Record<string, z.ZodTypeAny> = {};
@@ -47,7 +48,8 @@ const buildSchema = (tool: MCPTool) => {
 
 const createMCPAction = (
   tool: MCPTool,
-  provider: MCPProvider,
+  client: MCPClient,
+  serverConfig: MCPServerConfig,
 ): ResearchAction<any> => {
   const schema = buildSchema(tool);
 
@@ -58,7 +60,12 @@ const createMCPAction = (
     getDescription: () => tool.description,
     enabled: (_config) => {
       const mcpConfig = configManager.getConfig('mcp');
-      return mcpConfig?.enabled === true;
+      return (
+        Array.isArray(mcpConfig?.servers) &&
+        mcpConfig.servers.some(
+          (s: MCPServerConfig) => s.id === serverConfig.id && s.enabled,
+        )
+      );
     },
     execute: async (params, additionalConfig) => {
       const { type: _type, ...args } = params as any;
@@ -71,7 +78,7 @@ const createMCPAction = (
         researchBlock.data.subSteps.push({
           id: crypto.randomUUID(),
           type: 'searching',
-          searching: [`[MCP] ${tool.name}`],
+          searching: [`[MCP:${serverConfig.name}] ${tool.name}`],
         });
 
         additionalConfig.session.updateBlock(additionalConfig.researchBlockId, [
@@ -83,7 +90,7 @@ const createMCPAction = (
         ]);
       }
 
-      const result = await provider.callTool(tool.name, args);
+      const result = await client.callTool(tool.name, args);
 
       const textContent = result.content
         .filter((c) => c.type === 'text' && c.text)
@@ -93,7 +100,7 @@ const createMCPAction = (
       const chunk: Chunk = {
         content: textContent || JSON.stringify(result.content),
         metadata: {
-          title: `MCP: ${tool.name}`,
+          title: `MCP[${serverConfig.name}]: ${tool.name}`,
           url: '',
         },
       };
@@ -108,19 +115,32 @@ const createMCPAction = (
 
 const loadMCPActions = async (): Promise<ResearchAction<any>[]> => {
   const mcpConfig = configManager.getConfig('mcp');
+  const servers: MCPServerConfig[] = mcpConfig?.servers ?? [];
+  const enabledServers = servers.filter((s) => s.enabled);
 
-  if (!mcpConfig?.enabled || !mcpConfig?.baseURL) {
-    return [];
-  }
+  if (enabledServers.length === 0) return [];
 
-  try {
-    const provider = new MCPProvider(mcpConfig.baseURL, mcpConfig.apiKey);
-    const tools = await provider.listTools();
-    return tools.map((tool) => createMCPAction(tool, provider));
-  } catch (err) {
-    console.error('Failed to load MCP tools:', err);
-    return [];
-  }
+  const allActions: ResearchAction<any>[] = [];
+
+  await Promise.allSettled(
+    enabledServers.map(async (serverCfg) => {
+      try {
+        const client = new MCPClient(serverCfg);
+        const tools = await client.listTools();
+        const actions = tools.map((tool) =>
+          createMCPAction(tool, client, serverCfg),
+        );
+        allActions.push(...actions);
+      } catch (err) {
+        console.error(
+          `Failed to load MCP tools from server "${serverCfg.name}":`,
+          err,
+        );
+      }
+    }),
+  );
+
+  return allActions;
 };
 
 export { loadMCPActions, createMCPAction };
