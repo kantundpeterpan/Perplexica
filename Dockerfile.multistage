@@ -1,0 +1,72 @@
+# Multi-stage build: build Node app + prepare searxng venv in builder, keep runtime minimal
+
+# Builder: node app + searxng build artifacts
+FROM node:24.5.0-slim AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Cache apt and avoid re-downloading between builds (BuildKit required)
+RUN --mount=type=cache,id=apt,target=/var/cache/apt/archives \
+    apt-get update && apt-get install -y python3 python3-venv python3-pip git sqlite3 build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home/perplexica
+
+# Install JS deps (use cache mount for yarn)
+COPY package.json yarn.lock ./
+RUN --mount=type=cache,id=yarn,target=/root/.cache/yarn \
+    yarn install --frozen-lockfile --network-timeout 600000
+
+# Copy source and build
+COPY tsconfig.json next.config.mjs next-env.d.ts postcss.config.js drizzle.config.ts tailwind.config.ts ./
+COPY src ./src
+COPY public ./public
+COPY drizzle ./drizzle
+
+RUN mkdir -p /home/perplexica/data
+RUN yarn build
+
+# Build searxng and venv in builder to avoid build deps in final image
+RUN --mount=type=cache,id=pip,target=/root/.cache/pip \
+    git clone https://github.com/searxng/searxng /usr/local/searxng/searxng-src && \
+    python3 -m venv /usr/local/searxng/searx-pyenv && \
+    /usr/local/searxng/searx-pyenv/bin/pip install --upgrade pip setuptools wheel pyyaml msgspec typing_extensions && \
+    cd /usr/local/searxng/searxng-src && \
+    /usr/local/searxng/searx-pyenv/bin/pip install --use-pep517 --no-build-isolation -e .
+
+# Runtime: minimal image with only runtime deps and prebuilt artifacts
+FROM node:24.5.0-slim AS runtime
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y python3 sqlite3 curl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home/perplexica
+
+# Copy web app artifacts
+COPY --from=builder /home/perplexica/public ./public
+COPY --from=builder /home/perplexica/.next/static ./public/_next/static
+COPY --from=builder /home/perplexica/.next/standalone ./
+COPY --from=builder /home/perplexica/data ./data
+COPY drizzle ./drizzle
+
+# Create searxng system user and copy prebuilt venv + source from builder
+RUN useradd --system --create-home --home-dir /usr/local/searxng --shell /bin/bash searxng
+COPY --chown=searxng:searxng --from=builder /usr/local/searxng /usr/local/searxng
+
+# Copy configs and set ownership
+RUN mkdir -p /etc/searxng
+COPY searxng/settings.yml /etc/searxng/settings.yml
+COPY searxng/limiter.toml /etc/searxng/limiter.toml
+COPY searxng/uwsgi.ini /etc/searxng/uwsgi.ini
+RUN chown -R searxng:searxng /etc/searxng /usr/local/searxng
+
+RUN mkdir -p /home/perplexica/uploads && chown searxng:searxng /home/perplexica/uploads
+
+# Entrypoint and runtime user
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh && sed -i 's/\r$//' ./entrypoint.sh || true
+
+EXPOSE 3000 8080
+ENV SEARXNG_API_URL=http://localhost:8080
+
+USER searxng
+CMD ["/home/perplexica/entrypoint.sh"]

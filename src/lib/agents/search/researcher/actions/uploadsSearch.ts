@@ -1,6 +1,6 @@
 import z from 'zod';
 import { ResearchAction } from '../../types';
-import UploadStore from '@/lib/uploads/store';
+import { getVectorStore } from '@/lib/uploads/vectorStoreFactory';
 
 const schema = z.object({
   queries: z
@@ -49,12 +49,13 @@ const uploadsSearchAction: ResearchAction<typeof schema> = {
       ]);
     }
 
-    const uploadStore = new UploadStore({
-      embeddingModel: additionalConfig.embedding,
-      fileIds: additionalConfig.fileIds,
-    });
+    const uploadStore = await getVectorStore(additionalConfig.embedding);
 
-    const results = await uploadStore.query(input.queries, 10);
+    const results = await uploadStore.similaritySearch(
+      input.queries,
+      10,
+      { fileIds: additionalConfig.fileIds },
+    );
 
     const seenIds = new Map<string, number>();
 
