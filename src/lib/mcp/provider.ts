@@ -48,7 +48,7 @@ async function httpRpc(
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers },
     body: JSON.stringify(body),
   });
 
