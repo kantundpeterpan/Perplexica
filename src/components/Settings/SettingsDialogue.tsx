@@ -7,6 +7,7 @@ import {
   Search,
   Sliders,
   ToggleRight,
+  Wrench,
 } from 'lucide-react';
 import Preferences from './Sections/Preferences';
 import { motion } from 'framer-motion';
@@ -18,6 +19,7 @@ import Models from './Sections/Models/Section';
 import SearchSection from './Sections/Search';
 import Select from '@/components/ui/Select';
 import Personalization from './Sections/Personalization';
+import MCPSection from './Sections/MCP';
 
 const sections = [
   {
@@ -51,6 +53,14 @@ const sections = [
     icon: Search,
     component: SearchSection,
     dataAdd: 'search',
+  },
+  {
+    key: 'mcp',
+    name: 'MCP Tools',
+    description: 'Configure Model Context Protocol (MCP) tool integration.',
+    icon: Wrench,
+    component: MCPSection,
+    dataAdd: 'mcp',
   },
 ];
 

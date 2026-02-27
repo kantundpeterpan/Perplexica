@@ -60,6 +60,21 @@ type ConfigModelProvider = {
   hash: string;
 };
 
+type MCPToolScope = 'allow' | 'ask';
+
+type MCPToolOverride = {
+  name: string;
+  scope: MCPToolScope;
+};
+
+type MCPConfig = {
+  enabled: boolean;
+  baseURL: string;
+  apiKey?: string;
+  defaultScope: MCPToolScope;
+  toolOverrides: MCPToolOverride[];
+};
+
 type Config = {
   version: number;
   setupComplete: boolean;
@@ -73,6 +88,7 @@ type Config = {
   search: {
     [key: string]: any;
   };
+  mcp: MCPConfig;
 };
 
 type EnvMap = {
@@ -93,6 +109,7 @@ type UIConfigSections = {
   personalization: UIConfigField[];
   modelProviders: ModelProviderUISection[];
   search: UIConfigField[];
+  mcp: UIConfigField[];
 };
 
 export type {
@@ -106,4 +123,7 @@ export type {
   ConfigModelProvider,
   TextareaUIConfigField,
   SwitchUIConfigField,
+  MCPConfig,
+  MCPToolScope,
+  MCPToolOverride,
 };

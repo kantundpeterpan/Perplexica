@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'fs';
-import { Config, ConfigModelProvider, UIConfigSections } from './types';
+import { Config, ConfigModelProvider, MCPConfig, UIConfigSections } from './types';
 import { hashObj } from '../serverUtils';
 import { getModelProvidersUIConfigSection } from '../models/providers';
 
@@ -18,6 +18,13 @@ class ConfigManager {
     modelProviders: [],
     search: {
       searxngURL: '',
+    },
+    mcp: {
+      enabled: false,
+      baseURL: '',
+      apiKey: '',
+      defaultScope: 'allow',
+      toolOverrides: [],
     },
   };
   uiConfigSections: UIConfigSections = {
@@ -112,6 +119,53 @@ class ConfigManager {
         default: '',
         scope: 'server',
         env: 'SEARXNG_API_URL',
+      },
+    ],
+    mcp: [
+      {
+        name: 'Enable MCP',
+        key: 'enabled',
+        type: 'switch',
+        required: false,
+        description: 'Enable Model Context Protocol (MCP) tool integration.',
+        default: false,
+        scope: 'server',
+      },
+      {
+        name: 'MCP Base URL',
+        key: 'baseURL',
+        type: 'string',
+        required: false,
+        description: 'The base URL of your MCP server endpoint.',
+        placeholder: 'http://localhost:3001/mcp',
+        default: '',
+        scope: 'server',
+        env: 'MCP_BASE_URL',
+      },
+      {
+        name: 'MCP API Key',
+        key: 'apiKey',
+        type: 'password',
+        required: false,
+        description: 'Optional API key for authenticating with the MCP server.',
+        placeholder: 'MCP API Key',
+        default: '',
+        scope: 'server',
+        env: 'MCP_API_KEY',
+      },
+      {
+        name: 'Default Tool Scope',
+        key: 'defaultScope',
+        type: 'select',
+        required: false,
+        description:
+          'Default permission scope for MCP tools. "Allow" runs tools automatically; "Ask" requires user approval.',
+        default: 'allow',
+        options: [
+          { name: 'Allow (automatic)', value: 'allow' },
+          { name: 'Ask (require approval)', value: 'ask' },
+        ],
+        scope: 'server',
       },
     ],
   };
@@ -231,6 +285,24 @@ class ConfigManager {
       if (f.env && !this.currentConfig.search[f.key]) {
         this.currentConfig.search[f.key] =
           process.env[f.env] ?? f.default ?? '';
+      }
+    });
+
+    /* mcp section */
+    if (!this.currentConfig.mcp) {
+      this.currentConfig.mcp = {
+        enabled: false,
+        baseURL: '',
+        apiKey: '',
+        defaultScope: 'allow',
+        toolOverrides: [],
+      };
+    }
+    this.uiConfigSections.mcp.forEach((f) => {
+      const mcpKey = f.key as keyof MCPConfig;
+      if (f.env && !this.currentConfig.mcp[mcpKey]) {
+        const envVal = process.env[f.env] ?? (f as any).default ?? '';
+        (this.currentConfig.mcp as Record<string, any>)[f.key] = envVal;
       }
     });
 

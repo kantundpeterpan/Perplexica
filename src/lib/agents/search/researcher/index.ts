@@ -19,6 +19,8 @@ class Researcher {
           ? 6
           : 25;
 
+    await ActionRegistry.waitForReady();
+
     const availableTools = ActionRegistry.getAvailableActionTools({
       classification: input.classification,
       fileIds: input.config.fileIds,
