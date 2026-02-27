@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'fs';
-import { Config, ConfigModelProvider, MCPServerConfig, MCPServerTransport, UIConfigSections } from './types';
+import { Config, ConfigModelProvider, MCPServerConfig, MCPServerTransport, MCPToolScope, UIConfigSections } from './types';
 import { hashObj } from '../serverUtils';
 import { getModelProvidersUIConfigSection } from '../models/providers';
 
@@ -376,7 +376,8 @@ class ConfigManager {
   public addMCPServer(
     name: string,
     transport: MCPServerTransport,
-    defaultScope: 'allow' | 'ask' = 'allow',
+    defaultScope: MCPToolScope = 'allow',
+    systemPromptSnippet?: string,
   ): MCPServerConfig {
     const server: MCPServerConfig = {
       id: crypto.randomUUID(),
@@ -384,6 +385,7 @@ class ConfigManager {
       enabled: true,
       defaultScope,
       toolOverrides: [],
+      ...(systemPromptSnippet ? { systemPromptSnippet } : {}),
       transport,
     };
 
@@ -398,7 +400,12 @@ class ConfigManager {
     updates: Partial<
       Pick<
         MCPServerConfig,
-        'name' | 'enabled' | 'defaultScope' | 'transport' | 'toolOverrides'
+        | 'name'
+        | 'enabled'
+        | 'defaultScope'
+        | 'transport'
+        | 'toolOverrides'
+        | 'systemPromptSnippet'
       >
     >,
   ): MCPServerConfig {
@@ -416,6 +423,14 @@ class ConfigManager {
       (s) => s.id !== id,
     );
     this.saveConfig();
+  }
+
+  public getActiveMCPPromptSnippets(): string[] {
+    return this.currentConfig.mcp.servers
+      .filter((s): s is typeof s & { systemPromptSnippet: string } =>
+        s.enabled === true && typeof s.systemPromptSnippet === 'string' && s.systemPromptSnippet.length > 0,
+      )
+      .map((s) => s.systemPromptSnippet);
   }
 
   public isSetupComplete() {

@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import configManager from '@/lib/config';
-import { MCPServerTransport } from '@/lib/config/types';
+import { MCPServerTransport, MCPToolOverride, MCPToolScope } from '@/lib/config/types';
 
 /* PUT /api/mcp/servers/[id] - update an existing MCP server */
 export const PUT = async (
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) => {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
-    const { name, transport, defaultScope, enabled } = body as {
+    const { name, transport, defaultScope, enabled, toolOverrides, systemPromptSnippet } = body as {
       name?: string;
       transport?: MCPServerTransport;
-      defaultScope?: 'allow' | 'ask';
+      defaultScope?: MCPToolScope;
       enabled?: boolean;
+      toolOverrides?: MCPToolOverride[];
+      systemPromptSnippet?: string;
     };
 
     const updated = configManager.updateMCPServer(id, {
@@ -22,6 +24,8 @@ export const PUT = async (
       ...(transport !== undefined && { transport }),
       ...(defaultScope !== undefined && { defaultScope }),
       ...(enabled !== undefined && { enabled }),
+      ...(toolOverrides !== undefined && { toolOverrides }),
+      ...(systemPromptSnippet !== undefined && { systemPromptSnippet }),
     });
 
     return NextResponse.json({ server: updated });
@@ -37,10 +41,10 @@ export const PUT = async (
 /* DELETE /api/mcp/servers/[id] - remove an MCP server */
 export const DELETE = async (
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) => {
   try {
-    const { id } = params;
+    const { id } = await params;
     configManager.removeMCPServer(id);
     return NextResponse.json({ message: 'Server removed successfully.' });
   } catch (err: any) {

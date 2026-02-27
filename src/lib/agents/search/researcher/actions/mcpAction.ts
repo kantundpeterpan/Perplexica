@@ -60,12 +60,21 @@ const createMCPAction = (
     getDescription: () => tool.description,
     enabled: (_config) => {
       const mcpConfig = configManager.getConfig('mcp');
-      return (
-        Array.isArray(mcpConfig?.servers) &&
-        mcpConfig.servers.some(
-          (s: MCPServerConfig) => s.id === serverConfig.id && s.enabled,
-        )
+      if (!Array.isArray(mcpConfig?.servers)) return false;
+
+      const server = mcpConfig.servers.find(
+        (s: MCPServerConfig) => s.id === serverConfig.id,
       );
+
+      if (!server?.enabled) return false;
+
+      /* Check per-tool override scope */
+      const override = server.toolOverrides?.find(
+        (o: { name: string; scope: string }) => o.name === tool.name,
+      );
+      const scope = override?.scope ?? server.defaultScope;
+
+      return scope !== 'disabled';
     },
     execute: async (params, additionalConfig) => {
       const { type: _type, ...args } = params as any;
