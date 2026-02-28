@@ -52,11 +52,40 @@ class SearchAgent {
         .execute();
     }
 
-    // ── Chat mode: skip classification, research, and widgets ──────────────
+    // ── Chat mode: uses full tool pipeline but conversational writer ────────
     if (input.config.chatMode === 'chat') {
+      const classification = await classify({
+        chatHistory: input.chatHistory,
+        enabledSources: input.config.sources,
+        query: input.followUp,
+        llm: input.config.llm,
+      });
+
+      let searchResults: ResearcherOutput | null = null;
+      if (!classification.classification.skipSearch) {
+        const researcher = new Researcher();
+        searchResults = await researcher.research(session, {
+          chatHistory: input.chatHistory,
+          followUp: input.followUp,
+          classification,
+          config: input.config,
+        });
+      }
+
       session.emit('data', { type: 'researchComplete' });
 
-      const chatSystemPrompt = getChatPrompt(input.config.systemInstructions);
+      const finalContext =
+        searchResults?.searchFindings
+          .map(
+            (f, index) =>
+              `<result index=${index + 1} title=${f.metadata.title}>${f.content}</result>`,
+          )
+          .join('\n') || '';
+
+      const chatSystemPrompt = getChatPrompt(
+        input.config.chatSystemPrompt || input.config.systemInstructions,
+        finalContext,
+      );
       const answerStream = input.config.llm.streamText({
         messages: [
           { role: 'system', content: chatSystemPrompt },
@@ -66,7 +95,6 @@ class SearchAgent {
       });
 
       let responseBlockId = '';
-
       for await (const chunk of answerStream) {
         if (!responseBlockId) {
           const block: TextBlock = {

@@ -23,9 +23,10 @@ import ThinkBox from './ThinkBox';
 import { useChat, Section } from '@/lib/hooks/useChat';
 import Citation from './MessageRenderer/Citation';
 import AssistantSteps from './AssistantSteps';
-import { ResearchBlock } from '@/lib/types';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
+import MCPApprovalWidget from './MCPApprovalWidget';
+import { MCPApprovalBlock, ResearchBlock } from '@/lib/types';
 
 const ThinkTagProcessor = ({
   children,
@@ -57,6 +58,7 @@ const MessageBox = ({
     messages,
     researchEnded,
     chatHistory,
+    chatMode,
   } = useChat();
 
   const parsedMessage = section.parsedTextBlocks.join('\n\n');
@@ -143,9 +145,19 @@ const MessageBox = ({
               </div>
             ))}
 
+          {section.message.responseBlocks
+            .filter(
+              (block): block is MCPApprovalBlock =>
+                block.type === 'mcp_approval',
+            )
+            .map((approvalBlock) => (
+              <MCPApprovalWidget key={approvalBlock.id} block={approvalBlock} />
+            ))}
+
           {isLast &&
             loading &&
             !researchEnded &&
+            chatMode !== 'chat' &&
             !section.message.responseBlocks.some(
               (b) => b.type === 'research' && b.data.subSteps.length > 0,
             ) && (
@@ -160,7 +172,7 @@ const MessageBox = ({
           {section.widgets.length > 0 && <Renderer widgets={section.widgets} />}
 
           <div className="flex flex-col space-y-2">
-            {sources.length > 0 && (
+            {sources.length > 0 && chatMode !== 'chat' && (
               <div className="flex flex-row items-center space-x-2">
                 <Disc3
                   className={cn(

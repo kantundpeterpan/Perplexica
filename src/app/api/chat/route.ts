@@ -45,6 +45,7 @@ const bodySchema = z.object({
   chatModel: chatModelSchema,
   embeddingModel: embeddingModelSchema,
   systemInstructions: z.string().nullable().optional().default(''),
+  chatSystemPrompt: z.string().nullable().optional().default(''),
   chatMode: z.enum(['chat', 'research']).optional().default('research'),
   sessionMcpConfig: z
     .object({
@@ -236,6 +237,7 @@ export const POST = async (req: Request) => {
         mode: body.optimizationMode,
         fileIds: body.files,
         systemInstructions: body.systemInstructions || 'None',
+        chatSystemPrompt: body.chatSystemPrompt || undefined,
         chatMode: body.chatMode,
         sessionMcpConfig: body.sessionMcpConfig,
       },

@@ -5,6 +5,7 @@ import TextareaAutosize from 'react-textarea-autosize';
 import AttachSmall from './MessageInputActions/AttachSmall';
 import { useChat } from '@/lib/hooks/useChat';
 import ChatModeToggle from './MessageInputActions/ChatModeToggle';
+import SessionToolPanel from './MessageInputActions/SessionToolPanel';
 
 const MessageInput = () => {
   const { loading, sendMessage } = useChat();
@@ -87,9 +88,10 @@ const MessageInput = () => {
       )}
       {mode === 'multi' && (
         <div className="flex flex-row items-center justify-between w-full pt-2">
-          <div className="flex flex-row items-center space-x-2">
+          <div className="flex flex-row items-center space-x-2 flex-shrink-0">
             <AttachSmall />
             <ChatModeToggle />
+            <SessionToolPanel />
           </div>
           <button
             disabled={message.trim().length === 0 || loading}

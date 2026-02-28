@@ -14,7 +14,7 @@ const ChatModeToggle = () => {
 
   return (
     <div
-      className="flex flex-row items-center rounded-full border border-light-200 dark:border-dark-200 bg-light-primary dark:bg-dark-primary overflow-hidden text-xs"
+      className="flex flex-row items-center rounded-full border border-light-200 dark:border-dark-200 bg-light-primary dark:bg-dark-primary overflow-hidden text-xs flex-shrink-0 whitespace-nowrap"
       title="Toggle between Chat and Research mode"
     >
       <button

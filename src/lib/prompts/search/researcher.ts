@@ -323,6 +323,7 @@ export const getResearcherPrompt = (
   i: number,
   maxIteration: number,
   fileIds: string[],
+  mcpSnippets: string[] = [],
 ) => {
   let prompt = '';
 
@@ -348,6 +349,14 @@ export const getResearcherPrompt = (
     default:
       prompt = getSpeedPrompt(actionDesc, i, maxIteration, fileDesc);
       break;
+  }
+
+  if (mcpSnippets.length > 0) {
+    const MCP_CONTEXT_TAG = 'mcp_context';
+    prompt +=
+      `\n\n<${MCP_CONTEXT_TAG}>\n` +
+      mcpSnippets.map((s) => s.trim()).join('\n\n') +
+      `\n</${MCP_CONTEXT_TAG}>`;
   }
 
   return prompt;

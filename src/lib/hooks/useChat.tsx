@@ -786,6 +786,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           providerId: embeddingModelProvider.providerId,
         },
         systemInstructions: localStorage.getItem('systemInstructions'),
+        chatSystemPrompt: localStorage.getItem('chatSystemPrompt') || undefined,
       }),
     });
 

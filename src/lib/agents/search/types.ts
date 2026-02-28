@@ -45,9 +45,12 @@ export type SearchAgentConfig = {
   embedding: BaseEmbedding<any>;
   mode: 'speed' | 'balanced' | 'quality';
   systemInstructions: string;
-  /** When set to `'chat'` the agent responds conversationally and skips the
-   *  research pipeline.  Defaults to `'research'` (existing behaviour). */
+  /** When set to `'chat'` the agent responds conversationally.
+   *  Defaults to `'research'` (existing behaviour). */
   chatMode?: 'chat' | 'research';
+  /** Custom system prompt for chat mode. Overrides the built-in chat prompt
+   *  when provided. Configurable via Settings → Personalization. */
+  chatSystemPrompt?: string;
   /** Session-level MCP tool overrides.  Takes precedence over global config. */
   sessionMcpConfig?: SessionMcpConfig;
 };
