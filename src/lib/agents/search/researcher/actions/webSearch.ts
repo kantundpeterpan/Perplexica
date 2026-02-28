@@ -113,7 +113,20 @@ const webSearchAction: ResearchAction<typeof actionSchema> = {
     let results: Chunk[] = [];
 
     const search = async (q: string) => {
-      const res = await searchSearxng(q);
+      const sessionSearxng = additionalConfig.sessionMcpConfig?.searxng;
+
+      const searxngOpts: { safesearch?: 0 | 1 | 2 } = {};
+      if (sessionSearxng?.safeSearch !== undefined) {
+        // SearxNG's query param is `safesearch` (lowercase); the type alias
+        // `safeSearch` (camelCase) is the session config field name only.
+        searxngOpts.safesearch = sessionSearxng.safeSearch;
+      }
+
+      const res = await searchSearxng(
+        q,
+        searxngOpts,
+        sessionSearxng?.instanceUrl,
+      );
 
       const resultChunks: Chunk[] = res.results.map((r) => ({
         content: r.content || r.title,

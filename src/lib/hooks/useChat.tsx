@@ -18,6 +18,7 @@ import { MinimalProvider } from '../models/types';
 import { getAutoMediaSearch } from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
+import { SessionMcpConfig } from '@/lib/agents/search/types';
 
 export type Section = {
   message: Message;
@@ -37,6 +38,8 @@ type ChatContext = {
   sources: string[];
   chatId: string | undefined;
   optimizationMode: string;
+  chatMode: 'chat' | 'research';
+  sessionMcpConfig: SessionMcpConfig;
   isMessagesLoaded: boolean;
   loading: boolean;
   notFound: boolean;
@@ -48,6 +51,8 @@ type ChatContext = {
   researchEnded: boolean;
   setResearchEnded: (ended: boolean) => void;
   setOptimizationMode: (mode: string) => void;
+  setChatMode: (mode: 'chat' | 'research') => void;
+  setSessionMcpConfig: (config: SessionMcpConfig) => void;
   setSources: (sources: string[]) => void;
   setFiles: (files: File[]) => void;
   setFileIds: (fileIds: string[]) => void;
@@ -253,6 +258,8 @@ export const chatContext = createContext<ChatContext>({
   sections: [],
   notFound: false,
   optimizationMode: '',
+  chatMode: 'research',
+  sessionMcpConfig: {},
   chatModelProvider: { key: '', providerId: '' },
   embeddingModelProvider: { key: '', providerId: '' },
   researchEnded: false,
@@ -262,6 +269,8 @@ export const chatContext = createContext<ChatContext>({
   setFiles: () => {},
   setSources: () => {},
   setOptimizationMode: () => {},
+  setChatMode: () => {},
+  setSessionMcpConfig: () => {},
   setChatModelProvider: () => {},
   setEmbeddingModelProvider: () => {},
   setResearchEnded: () => {},
@@ -289,6 +298,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [sources, setSources] = useState<string[]>(['web']);
   const [optimizationMode, setOptimizationMode] = useState('speed');
+  const [chatMode, setChatMode] = useState<'chat' | 'research'>('research');
+  const [sessionMcpConfig, setSessionMcpConfig] = useState<SessionMcpConfig>({});
 
   const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
 
@@ -758,6 +769,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         files: fileIds,
         sources: sources,
         optimizationMode: optimizationMode,
+        chatMode: chatMode,
+        sessionMcpConfig: sessionMcpConfig,
         history: rewrite
           ? chatHistory.current.slice(
               0,
@@ -822,10 +835,14 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         messageAppeared,
         notFound,
         optimizationMode,
+        chatMode,
+        sessionMcpConfig,
         setFileIds,
         setFiles,
         setSources,
         setOptimizationMode,
+        setChatMode,
+        setSessionMcpConfig,
         rewrite,
         sendMessage,
         setChatModelProvider,

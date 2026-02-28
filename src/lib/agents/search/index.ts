@@ -3,6 +3,7 @@ import SessionManager from '@/lib/session';
 import { classify } from './classifier';
 import Researcher from './researcher';
 import { getWriterPrompt } from '@/lib/prompts/search/writer';
+import { getChatPrompt } from '@/lib/prompts/search/chat';
 import { WidgetExecutor } from './widgets';
 import db from '@/lib/db';
 import { chats, messages } from '@/lib/db/schema';
@@ -50,6 +51,57 @@ class SearchAgent {
         )
         .execute();
     }
+
+    // ── Chat mode: skip classification, research, and widgets ──────────────
+    if (input.config.chatMode === 'chat') {
+      session.emit('data', { type: 'researchComplete' });
+
+      const chatSystemPrompt = getChatPrompt(input.config.systemInstructions);
+      const answerStream = input.config.llm.streamText({
+        messages: [
+          { role: 'system', content: chatSystemPrompt },
+          ...input.chatHistory,
+          { role: 'user', content: input.followUp },
+        ],
+      });
+
+      let responseBlockId = '';
+
+      for await (const chunk of answerStream) {
+        if (!responseBlockId) {
+          const block: TextBlock = {
+            id: crypto.randomUUID(),
+            type: 'text',
+            data: chunk.contentChunk,
+          };
+          session.emitBlock(block);
+          responseBlockId = block.id;
+        } else {
+          const block = session.getBlock(responseBlockId) as TextBlock | null;
+          if (!block) continue;
+          block.data += chunk.contentChunk;
+          session.updateBlock(block.id, [
+            { op: 'replace', path: '/data', value: block.data },
+          ]);
+        }
+      }
+
+      session.emit('end', {});
+
+      await db
+        .update(messages)
+        .set({ status: 'completed', responseBlocks: session.getAllBlocks() })
+        .where(
+          and(
+            eq(messages.chatId, input.chatId),
+            eq(messages.messageId, input.messageId),
+          ),
+        )
+        .execute();
+
+      return;
+    }
+    // ── Research mode (default) ────────────────────────────────────────────
 
     const classification = await classify({
       chatHistory: input.chatHistory,
