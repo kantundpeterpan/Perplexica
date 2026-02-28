@@ -23,9 +23,10 @@ import ThinkBox from './ThinkBox';
 import { useChat, Section } from '@/lib/hooks/useChat';
 import Citation from './MessageRenderer/Citation';
 import AssistantSteps from './AssistantSteps';
-import { ResearchBlock } from '@/lib/types';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
+import MCPApprovalWidget from './MCPApprovalWidget';
+import { MCPApprovalBlock, ResearchBlock } from '@/lib/types';
 
 const ThinkTagProcessor = ({
   children,
@@ -141,6 +142,15 @@ const MessageBox = ({
                   isLast={isLast}
                 />
               </div>
+            ))}
+
+          {section.message.responseBlocks
+            .filter(
+              (block): block is MCPApprovalBlock =>
+                block.type === 'mcp_approval',
+            )
+            .map((approvalBlock) => (
+              <MCPApprovalWidget key={approvalBlock.id} block={approvalBlock} />
             ))}
 
           {isLast &&

@@ -5,6 +5,8 @@ import SessionManager from '@/lib/session';
 import { Message, ReasoningResearchBlock } from '@/lib/types';
 import formatChatHistoryAsString from '@/lib/utils/formatHistory';
 import { ToolCall } from '@/lib/models/types';
+import configManager from '@/lib/config';
+import { McpApprovalDeniedError } from './actions/mcpAction';
 
 class Researcher {
   async research(
@@ -18,6 +20,10 @@ class Researcher {
         : input.config.mode === 'balanced'
           ? 6
           : 25;
+
+    await ActionRegistry.waitForReady();
+
+    const mcpSnippets = configManager.getActiveMCPPromptSnippets();
 
     const availableTools = ActionRegistry.getAvailableActionTools({
       classification: input.classification,
@@ -63,6 +69,7 @@ class Researcher {
         i,
         maxIteration,
         input.config.fileIds,
+        mcpSnippets,
       );
 
       const actionStream = input.config.llm.streamText({
@@ -161,13 +168,22 @@ class Researcher {
         tool_calls: finalToolCalls,
       });
 
-      const actionResults = await ActionRegistry.executeAll(finalToolCalls, {
-        llm: input.config.llm,
-        embedding: input.config.embedding,
-        session: session,
-        researchBlockId: researchBlockId,
-        fileIds: input.config.fileIds,
-      });
+      let actionResults: ActionOutput[];
+      try {
+        actionResults = await ActionRegistry.executeAll(finalToolCalls, {
+          llm: input.config.llm,
+          embedding: input.config.embedding,
+          session: session,
+          researchBlockId: researchBlockId,
+          fileIds: input.config.fileIds,
+        });
+      } catch (err) {
+        if (err instanceof McpApprovalDeniedError) {
+          /* User denied the tool — stop the research loop gracefully. */
+          break;
+        }
+        throw err;
+      }
 
       actionOutput.push(...actionResults);
 

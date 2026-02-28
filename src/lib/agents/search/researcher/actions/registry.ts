@@ -10,9 +10,18 @@ import {
 
 class ActionRegistry {
   private static actions: Map<string, ResearchAction> = new Map();
+  private static readyPromise: Promise<void> = Promise.resolve();
 
   static register(action: ResearchAction<any>) {
     this.actions.set(action.name, action);
+  }
+
+  static setReadyPromise(promise: Promise<void>) {
+    this.readyPromise = promise;
+  }
+
+  static waitForReady(): Promise<void> {
+    return this.readyPromise;
   }
 
   static get(name: string): ResearchAction | undefined {
