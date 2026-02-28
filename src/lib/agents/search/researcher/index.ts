@@ -24,6 +24,7 @@ class Researcher {
       fileIds: input.config.fileIds,
       mode: input.config.mode,
       sources: input.config.sources,
+      disabledTools: input.config.sessionMcpConfig?.disabledTools,
     });
 
     const availableActionsDescription =
@@ -32,6 +33,7 @@ class Researcher {
         fileIds: input.config.fileIds,
         mode: input.config.mode,
         sources: input.config.sources,
+        disabledTools: input.config.sessionMcpConfig?.disabledTools,
       });
 
     const researchBlockId = crypto.randomUUID();
@@ -167,6 +169,7 @@ class Researcher {
         session: session,
         researchBlockId: researchBlockId,
         fileIds: input.config.fileIds,
+        sessionMcpConfig: input.config.sessionMcpConfig,
       });
 
       actionOutput.push(...actionResults);
