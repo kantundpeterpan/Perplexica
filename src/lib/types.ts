@@ -115,9 +115,24 @@ export type ResearchBlock = {
   };
 };
 
+export type MCPApprovalBlock = {
+  id: string;
+  type: 'mcp_approval';
+  data: {
+    sessionId: string;
+    toolName: string;
+    serverName: string;
+    args: Record<string, any>;
+    reasoning?: string;
+    status: 'pending' | 'approved' | 'denied';
+    steering?: string;
+  };
+};
+
 export type Block =
   | TextBlock
   | SourceBlock
   | SuggestionBlock
   | WidgetBlock
-  | ResearchBlock;
+  | ResearchBlock
+  | MCPApprovalBlock;

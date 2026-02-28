@@ -6,6 +6,7 @@ import { Message, ReasoningResearchBlock } from '@/lib/types';
 import formatChatHistoryAsString from '@/lib/utils/formatHistory';
 import { ToolCall } from '@/lib/models/types';
 import configManager from '@/lib/config';
+import { McpApprovalDeniedError } from './actions/mcpAction';
 
 class Researcher {
   async research(
@@ -167,13 +168,22 @@ class Researcher {
         tool_calls: finalToolCalls,
       });
 
-      const actionResults = await ActionRegistry.executeAll(finalToolCalls, {
-        llm: input.config.llm,
-        embedding: input.config.embedding,
-        session: session,
-        researchBlockId: researchBlockId,
-        fileIds: input.config.fileIds,
-      });
+      let actionResults: ActionOutput[];
+      try {
+        actionResults = await ActionRegistry.executeAll(finalToolCalls, {
+          llm: input.config.llm,
+          embedding: input.config.embedding,
+          session: session,
+          researchBlockId: researchBlockId,
+          fileIds: input.config.fileIds,
+        });
+      } catch (err) {
+        if (err instanceof McpApprovalDeniedError) {
+          /* User denied the tool — stop the research loop gracefully. */
+          break;
+        }
+        throw err;
+      }
 
       actionOutput.push(...actionResults);
 

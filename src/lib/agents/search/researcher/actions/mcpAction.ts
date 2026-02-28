@@ -5,6 +5,14 @@ import MCPClient, { MCPTool } from '@/lib/mcp/provider';
 import configManager from '@/lib/config';
 import { MCPServerConfig } from '@/lib/config/types';
 
+/** Thrown when the user denies an ask-scope tool — caught by the researcher loop */
+export class McpApprovalDeniedError extends Error {
+  constructor(toolName: string) {
+    super(`User denied execution of MCP tool "${toolName}"`);
+    this.name = 'McpApprovalDeniedError';
+  }
+}
+
 const buildSchema = (tool: MCPTool) => {
   const properties: Record<string, z.ZodTypeAny> = {};
 
@@ -92,18 +100,57 @@ const createMCPAction = (
         liveOverride?.scope ?? liveServer?.defaultScope ?? 'allow';
 
       if (effectiveScope === 'ask') {
-        return {
-          type: 'search_results',
-          results: [
-            {
-              content: `Tool "${tool.name}" from MCP server "${serverConfig.name}" requires user approval before it can be used. To enable automatic execution, change the tool scope to "Allow" in Settings → MCP Tools.`,
-              metadata: {
-                title: `[Approval Required] ${serverConfig.name}: ${tool.name}`,
-                url: '',
-              },
-            },
-          ],
-        };
+        /* Extract the latest reasoning from the research block so the approval
+         * widget can show it to the user. */
+        const currentResearchBlock = additionalConfig.session.getBlock(
+          additionalConfig.researchBlockId,
+        );
+        const lastReasoning =
+          currentResearchBlock?.type === 'research'
+            ? currentResearchBlock.data.subSteps
+                .findLast((s) => s.type === 'reasoning')
+                ?.reasoning
+            : undefined;
+
+        /* Emit the approval-request block so the UI can render the widget. */
+        const approvalBlockId = crypto.randomUUID();
+        additionalConfig.session.emitBlock({
+          id: approvalBlockId,
+          type: 'mcp_approval',
+          data: {
+            sessionId: additionalConfig.session.id,
+            toolName: tool.name,
+            serverName: serverConfig.name,
+            args,
+            reasoning: lastReasoning,
+            status: 'pending',
+          },
+        });
+
+        /* Pause until the user approves or denies via /api/mcp/approval/[blockId] */
+        const { approved, steering } =
+          await additionalConfig.session.waitForApproval(approvalBlockId);
+
+        if (!approved) {
+          if (steering) {
+            /* Return steering text as tool context so the LLM can act on it. */
+            return {
+              type: 'search_results',
+              results: [
+                {
+                  content: `User declined to run tool "${tool.name}" from "${serverConfig.name}". User guidance: ${steering}`,
+                  metadata: {
+                    title: `[Tool Declined] ${serverConfig.name}: ${tool.name}`,
+                    url: '',
+                  },
+                },
+              ],
+            } satisfies { type: 'search_results'; results: Chunk[] };
+          }
+          /* No steering — abort the research loop entirely. */
+          throw new McpApprovalDeniedError(tool.name);
+        }
+        /* Approved — fall through to execute the tool normally. */
       }
 
       const researchBlock = additionalConfig.session.getBlock(
