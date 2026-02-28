@@ -79,6 +79,33 @@ const createMCPAction = (
     execute: async (params, additionalConfig) => {
       const { type: _type, ...args } = params as any;
 
+      /* Enforce ask scope: re-read config live so UI scope changes take effect
+       * without restarting the server. */
+      const liveMcpConfig = configManager.getConfig('mcp');
+      const liveServer = liveMcpConfig?.servers?.find(
+        (s: MCPServerConfig) => s.id === serverConfig.id,
+      );
+      const liveOverride = liveServer?.toolOverrides?.find(
+        (o: { name: string; scope: string }) => o.name === tool.name,
+      );
+      const effectiveScope =
+        liveOverride?.scope ?? liveServer?.defaultScope ?? 'allow';
+
+      if (effectiveScope === 'ask') {
+        return {
+          type: 'search_results',
+          results: [
+            {
+              content: `Tool "${tool.name}" from MCP server "${serverConfig.name}" requires user approval before it can be used. To enable automatic execution, change the tool scope to "Allow" in Settings → MCP Tools.`,
+              metadata: {
+                title: `[Approval Required] ${serverConfig.name}: ${tool.name}`,
+                url: '',
+              },
+            },
+          ],
+        };
+      }
+
       const researchBlock = additionalConfig.session.getBlock(
         additionalConfig.researchBlockId,
       );
