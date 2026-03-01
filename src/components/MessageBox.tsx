@@ -26,6 +26,7 @@ import AssistantSteps from './AssistantSteps';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
 import MCPApprovalWidget from './MCPApprovalWidget';
+import CodeCellPanel from './CodeCellPanel';
 import { MCPApprovalBlock, ResearchBlock } from '@/lib/types';
 
 const ThinkTagProcessor = ({
@@ -280,8 +281,13 @@ const MessageBox = ({
           </div>
         </div>
 
-        {hasContent && (
+        {(hasContent || section.codeCells.length > 0) && (
           <div className="lg:sticky lg:top-20 flex flex-col items-center space-y-3 w-full lg:w-3/12 z-30 h-full pb-4">
+            {section.codeCells.length > 0 && (
+              <div className="w-full">
+                <CodeCellPanel codeCells={section.codeCells} />
+              </div>
+            )}
             <SearchImages
               query={section.message.query}
               chatHistory={chatHistory}

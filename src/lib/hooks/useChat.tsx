@@ -20,6 +20,12 @@ import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
 import { SessionMcpConfig } from '@/lib/agents/search/types';
 
+export type CodeCell = {
+  id: string;
+  language: string;
+  code: string;
+};
+
 export type Section = {
   message: Message;
   widgets: Widget[];
@@ -27,6 +33,7 @@ export type Section = {
   speechMessage: string;
   thinkingEnded: boolean;
   suggestions?: string[];
+  codeCells: CodeCell[];
 };
 
 type ChatContext = {
@@ -330,6 +337,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       let speechMessage = '';
       let thinkingEnded = false;
       let suggestions: string[] = [];
+      const codeCells: CodeCell[] = [];
 
       const sourceBlocks = msg.responseBlocks.filter(
         (block): block is Block & { type: 'source' } => block.type === 'source',
@@ -358,6 +366,21 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
           if (block.data.includes('</think>')) {
             thinkingEnded = true;
+          }
+
+          // Extract code cells from fenced code blocks
+          const codeFenceRe = /```(\w*)\n([\s\S]*?)```/g;
+          let fenceMatch: RegExpExecArray | null;
+          while ((fenceMatch = codeFenceRe.exec(block.data)) !== null) {
+            const language = fenceMatch[1].trim() || 'text';
+            const code = fenceMatch[2].trimEnd();
+            if (code) {
+              codeCells.push({
+                id: `${msg.messageId}-code-${codeCells.length}`,
+                language,
+                code,
+              });
+            }
           }
 
           if (sources.length > 0) {
@@ -399,6 +422,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           textBlocks.push(processedText);
         } else if (block.type === 'suggestion') {
           suggestions = block.data;
+        } else if (block.type === 'code_cell') {
+          codeCells.push({
+            id: block.id,
+            language: block.data.language,
+            code: block.data.code,
+          });
         }
       });
 
@@ -409,6 +438,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         thinkingEnded,
         suggestions,
         widgets: widgetBlocks,
+        codeCells,
       };
     });
   }, [messages]);

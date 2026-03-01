@@ -129,10 +129,29 @@ export type MCPApprovalBlock = {
   };
 };
 
+export type CodeCellRun = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  timestamp: string;
+};
+
+export type CodeCellBlock = {
+  id: string;
+  type: 'code_cell';
+  data: {
+    language: string;
+    code: string;
+    label?: string;
+    runs: CodeCellRun[];
+  };
+};
+
 export type Block =
   | TextBlock
   | SourceBlock
   | SuggestionBlock
   | WidgetBlock
   | ResearchBlock
-  | MCPApprovalBlock;
+  | MCPApprovalBlock
+  | CodeCellBlock;
