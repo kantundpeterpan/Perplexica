@@ -18,6 +18,12 @@ export const getShowWeatherWidget = () =>
 export const getShowNewsWidget = () =>
   getClientConfig('showNewsWidget', 'true') === 'true';
 
+export const getCodeCellTruncateLines = (): number => {
+  const val = getClientConfig('codeCellTruncateLines', '10');
+  const parsed = parseInt(val, 10);
+  return isNaN(parsed) || parsed < 1 ? 10 : parsed;
+};
+
 export const getMeasurementUnit = () => {
   const value =
     getClientConfig('measureUnit') ??

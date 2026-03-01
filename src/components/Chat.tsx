@@ -5,9 +5,12 @@ import MessageInput from './MessageInput';
 import MessageBox from './MessageBox';
 import MessageBoxLoading from './MessageBoxLoading';
 import { useChat } from '@/lib/hooks/useChat';
+import { cn } from '@/lib/utils';
 
 const Chat = () => {
   const { sections, loading, messageAppeared, messages } = useChat();
+
+  const hasCells = sections.some((s) => s.codeCells.length > 0);
 
   const [dividerWidth, setDividerWidth] = useState(0);
   const dividerRef = useRef<HTMLDivElement | null>(null);
@@ -59,7 +62,12 @@ const Chat = () => {
   }, [messages]);
 
   return (
-    <div className="flex flex-col space-y-6 pt-8 pb-44 lg:pb-28 sm:mx-4 md:mx-8">
+    <div
+      className={cn(
+        'flex flex-col space-y-6 pt-8 pb-44 lg:pb-28',
+        hasCells ? 'sm:mx-2 md:mx-4' : 'sm:mx-4 md:mx-8',
+      )}
+    >
       {sections.map((section, i) => {
         const isLast = i === sections.length - 1;
 

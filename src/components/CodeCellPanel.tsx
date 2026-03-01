@@ -1,13 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   PlayIcon,
   CheckIcon,
   CopyIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   TerminalIcon,
   AlertTriangleIcon,
 } from 'lucide-react';
@@ -99,19 +97,16 @@ const RunWarningBanner = ({
 
 const SingleCodeCell = ({
   cell,
-  index,
   executionAcknowledged,
   onAcknowledge,
 }: {
   cell: CodeCell;
-  index: number;
   executionAcknowledged: boolean;
   onAcknowledge: () => void;
 }) => {
   const [runState, setRunState] = useState<RunState>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [pendingRun, setPendingRun] = useState(false);
   const isRunnable = RUNNABLE_LANGUAGES.has(cell.language.toLowerCase());
 
@@ -164,15 +159,9 @@ const SingleCodeCell = ({
   };
 
   return (
-    <div className="rounded-xl border border-light-200 dark:border-dark-200 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-light-secondary dark:bg-dark-secondary border-b border-light-200 dark:border-dark-200">
-        <span className="text-xs font-mono font-semibold text-black/60 dark:text-white/60 bg-light-primary dark:bg-dark-primary px-2 py-0.5 rounded-md border border-light-200 dark:border-dark-200">
-          {cell.language || 'text'}
-        </span>
-        <span className="text-xs text-black/40 dark:text-white/40">
-          Cell {index + 1}
-        </span>
+    <div className="flex flex-col">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-light-200 dark:border-dark-200">
         <div className="ml-auto flex items-center gap-1">
           {isRunnable && (
             <button
@@ -193,74 +182,112 @@ const SingleCodeCell = ({
           <button
             onClick={handleCopy}
             title="Copy code"
-            className="p-1.5 rounded-lg text-black/50 dark:text-white/50 hover:bg-light-primary dark:hover:bg-dark-primary transition-colors duration-200"
+            className="p-1.5 rounded-lg text-black/50 dark:text-white/50 hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors duration-200"
           >
             {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-          </button>
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            title={collapsed ? 'Expand' : 'Collapse'}
-            className="p-1.5 rounded-lg text-black/50 dark:text-white/50 hover:bg-light-primary dark:hover:bg-dark-primary transition-colors duration-200"
-          >
-            {collapsed ? (
-              <ChevronDownIcon size={13} />
-            ) : (
-              <ChevronUpIcon size={13} />
-            )}
           </button>
         </div>
       </div>
 
       {/* Code body */}
-      {!collapsed && (
-        <div className="text-sm">
-          <CodeBlock language={cell.language}>{cell.code}</CodeBlock>
-        </div>
-      )}
+      <div className="text-sm overflow-auto max-h-[60vh]">
+        <CodeBlock language={cell.language}>{cell.code}</CodeBlock>
+      </div>
 
       {/* Warning / run output */}
-      {!collapsed && (
-        <div className="px-3 pb-3">
-          {pendingRun && (
-            <RunWarningBanner
-              onConfirm={handleConfirm}
-              onCancel={() => setPendingRun(false)}
-            />
-          )}
-          {runState && <CellRunOutput run={runState} />}
-        </div>
-      )}
+      <div className="px-3 pb-3">
+        {pendingRun && (
+          <RunWarningBanner
+            onConfirm={handleConfirm}
+            onCancel={() => setPendingRun(false)}
+          />
+        )}
+        {runState && <CellRunOutput run={runState} />}
+      </div>
     </div>
   );
 };
 
-const CodeCellPanel = ({ codeCells }: { codeCells: CodeCell[] }) => {
+const CodeCellPanel = ({
+  codeCells,
+  activeCellIndex,
+  onCellActivate,
+}: {
+  codeCells: CodeCell[];
+  activeCellIndex?: number;
+  onCellActivate?: (index: number) => void;
+}) => {
   const [executionAcknowledged, setExecutionAcknowledged] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Sync external activation (e.g. clicking a truncated inline block)
+  useEffect(() => {
+    if (activeCellIndex !== undefined && activeCellIndex < codeCells.length) {
+      setActiveTab(activeCellIndex);
+    }
+  }, [activeCellIndex, codeCells.length]);
+
+  // When a new cell is streamed in, auto-select the latest tab
+  // Initialized with current length so the effect only fires for *new* cells
+  // streamed in after this component mounts (not on initial load from history).
+  const prevLengthRef = React.useRef(codeCells.length);
+  useEffect(() => {
+    if (codeCells.length > prevLengthRef.current) {
+      setActiveTab(codeCells.length - 1);
+    }
+    prevLengthRef.current = codeCells.length;
+  }, [codeCells.length]);
 
   if (codeCells.length === 0) return null;
 
+  const activeCell = codeCells[activeTab] ?? codeCells[0];
+
+  const handleTabClick = (i: number) => {
+    setActiveTab(i);
+    onCellActivate?.(i);
+  };
+
   return (
-    <div className="flex flex-col space-y-3 w-full">
-      <div className="flex items-center gap-2">
-        <TerminalIcon size={18} className="text-black dark:text-white" />
-        <h3 className="text-black dark:text-white font-medium text-base">
+    <div className="flex flex-col w-full rounded-xl border border-light-200 dark:border-dark-200 overflow-hidden">
+      {/* Panel header */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-light-secondary dark:bg-dark-secondary border-b border-light-200 dark:border-dark-200 flex-shrink-0">
+        <TerminalIcon size={14} className="text-black/60 dark:text-white/60" />
+        <span className="text-xs font-medium text-black/60 dark:text-white/60">
           Code Cells
-        </h3>
-        <span className="text-xs text-black/40 dark:text-white/40 bg-light-secondary dark:bg-dark-secondary px-2 py-0.5 rounded-full">
+        </span>
+        <span className="text-xs text-black/30 dark:text-white/30 bg-light-primary dark:bg-dark-primary px-1.5 py-0.5 rounded-full">
           {codeCells.length}
         </span>
       </div>
-      <div className="flex flex-col space-y-3">
-        {codeCells.map((cell, i) => (
-          <SingleCodeCell
-            key={cell.id}
-            cell={cell}
-            index={i}
-            executionAcknowledged={executionAcknowledged}
-            onAcknowledge={() => setExecutionAcknowledged(true)}
-          />
-        ))}
-      </div>
+
+      {/* Tab bar */}
+      {codeCells.length > 1 && (
+        <div className="flex overflow-x-auto border-b border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary">
+          {codeCells.map((cell, i) => (
+            <button
+              key={cell.id}
+              onClick={() => handleTabClick(i)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 text-xs whitespace-nowrap border-b-2 transition-colors duration-150 flex-shrink-0',
+                activeTab === i
+                  ? 'border-[#24A0ED] text-[#24A0ED] bg-light-primary dark:bg-dark-primary'
+                  : 'border-transparent text-black/50 dark:text-white/50 hover:text-black/70 dark:hover:text-white/70 hover:bg-light-primary/50 dark:hover:bg-dark-primary/50',
+              )}
+            >
+              <span className="font-mono">{cell.language || 'text'}</span>
+              <span className="opacity-60">#{i + 1}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Active cell content */}
+      <SingleCodeCell
+        key={activeCell.id}
+        cell={activeCell}
+        executionAcknowledged={executionAcknowledged}
+        onAcknowledge={() => setExecutionAcknowledged(true)}
+      />
     </div>
   );
 };

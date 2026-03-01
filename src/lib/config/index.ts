@@ -90,6 +90,23 @@ class ConfigManager {
         default: true,
         scope: 'client',
       },
+      {
+        name: 'Code cell preview lines',
+        key: 'codeCellTruncateLines',
+        type: 'select',
+        options: [
+          { name: '5 lines', value: '5' },
+          { name: '10 lines', value: '10' },
+          { name: '15 lines', value: '15' },
+          { name: '20 lines', value: '20' },
+          { name: '30 lines', value: '30' },
+        ],
+        required: false,
+        description:
+          'Maximum lines shown inline in the chat before a code block is truncated. The full code is always available in the Code Cells panel.',
+        default: '10',
+        scope: 'client',
+      },
     ],
     personalization: [
       {
