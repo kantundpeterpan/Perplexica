@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, FlaskConical } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import AttachSmall from './MessageInputActions/AttachSmall';
@@ -8,7 +8,7 @@ import ChatModeToggle from './MessageInputActions/ChatModeToggle';
 import SessionToolPanel from './MessageInputActions/SessionToolPanel';
 
 const MessageInput = () => {
-  const { loading, sendMessage } = useChat();
+  const { loading, sendMessage, chatMode } = useChat();
 
   const [copilotEnabled, setCopilotEnabled] = useState(false);
   const [message, setMessage] = useState('');
@@ -93,12 +93,31 @@ const MessageInput = () => {
             <ChatModeToggle />
             <SessionToolPanel />
           </div>
-          <button
-            disabled={message.trim().length === 0 || loading}
-            className="bg-[#24A0ED] text-white disabled:text-black/50 dark:disabled:text-white/50 hover:bg-opacity-85 transition duration-100 disabled:bg-[#e0e0dc79] dark:disabled:bg-[#ececec21] rounded-full p-2"
-          >
-            <ArrowUp className="bg-background" size={17} />
-          </button>
+          <div className="flex flex-row items-center space-x-2">
+            {/* Deep Research button – only shown in chat mode */}
+            {chatMode === 'chat' && (
+              <button
+                type="button"
+                disabled={message.trim().length === 0 || loading}
+                onClick={() => {
+                  if (!message.trim() || loading) return;
+                  sendMessage(message, undefined, false, 'research');
+                  setMessage('');
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-light-200 dark:border-dark-200 text-xs text-black/50 dark:text-white/50 hover:text-sky-500 hover:border-sky-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
+                title="Trigger a comprehensive Deep Research run for this query"
+              >
+                <FlaskConical size={12} />
+                <span>Deep Research</span>
+              </button>
+            )}
+            <button
+              disabled={message.trim().length === 0 || loading}
+              className="bg-[#24A0ED] text-white disabled:text-black/50 dark:disabled:text-white/50 hover:bg-opacity-85 transition duration-100 disabled:bg-[#e0e0dc79] dark:disabled:bg-[#ececec21] rounded-full p-2"
+            >
+              <ArrowUp className="bg-background" size={17} />
+            </button>
+          </div>
         </div>
       )}
     </form>

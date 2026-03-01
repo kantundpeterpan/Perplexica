@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, FlaskConical } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import Sources from './MessageInputActions/Sources';
@@ -10,7 +10,7 @@ import ChatModeToggle from './MessageInputActions/ChatModeToggle';
 import SessionToolPanel from './MessageInputActions/SessionToolPanel';
 
 const EmptyChatMessageInput = () => {
-  const { sendMessage } = useChat();
+  const { sendMessage, chatMode } = useChat();
 
   /* const [copilotEnabled, setCopilotEnabled] = useState(false); */
   const [message, setMessage] = useState('');
@@ -78,6 +78,23 @@ const EmptyChatMessageInput = () => {
               <ModelSelector />
               <Attach />
             </div>
+            {/* Deep Research button – chat mode only */}
+            {chatMode === 'chat' && (
+              <button
+                type="button"
+                disabled={message.trim().length === 0}
+                onClick={() => {
+                  if (!message.trim()) return;
+                  sendMessage(message, undefined, false, 'research');
+                  setMessage('');
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-light-200 dark:border-dark-200 text-xs text-black/50 dark:text-white/50 hover:text-sky-500 hover:border-sky-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
+                title="Trigger a comprehensive Deep Research run for this query"
+              >
+                <FlaskConical size={12} />
+                <span>Deep Research</span>
+              </button>
+            )}
             <button
               disabled={message.trim().length === 0}
               className="bg-sky-500 text-white disabled:text-black/50 dark:disabled:text-white/50 disabled:bg-[#e0e0dc] dark:disabled:bg-[#ececec21] hover:bg-opacity-85 transition duration-100 rounded-full p-2"

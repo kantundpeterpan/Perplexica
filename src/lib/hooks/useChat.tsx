@@ -40,6 +40,8 @@ type ChatContext = {
   optimizationMode: string;
   chatMode: 'chat' | 'research';
   sessionMcpConfig: SessionMcpConfig;
+  /** Message IDs that were sent in deep-research mode from within chat mode. */
+  researchOnlyMessageIds: string[];
   isMessagesLoaded: boolean;
   loading: boolean;
   notFound: boolean;
@@ -60,6 +62,7 @@ type ChatContext = {
     message: string,
     messageId?: string,
     rewrite?: boolean,
+    overrideChatMode?: 'chat' | 'research',
   ) => Promise<void>;
   rewrite: (messageId: string) => void;
   setChatModelProvider: (provider: ChatModelProvider) => void;
@@ -260,6 +263,7 @@ export const chatContext = createContext<ChatContext>({
   optimizationMode: '',
   chatMode: 'research',
   sessionMcpConfig: {},
+  researchOnlyMessageIds: [],
   chatModelProvider: { key: '', providerId: '' },
   embeddingModelProvider: { key: '', providerId: '' },
   researchEnded: false,
@@ -300,6 +304,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [optimizationMode, setOptimizationMode] = useState('speed');
   const [chatMode, setChatMode] = useState<'chat' | 'research'>('research');
   const [sessionMcpConfig, setSessionMcpConfig] = useState<SessionMcpConfig>({});
+  const [researchOnlyMessageIds, setResearchOnlyMessageIds] = useState<string[]>([]);
 
   const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
 
@@ -726,6 +731,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     message,
     messageId,
     rewrite = false,
+    overrideChatMode,
   ) => {
     if (loading || !message) return;
     setLoading(true);
@@ -738,6 +744,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     messageId = messageId ?? crypto.randomBytes(7).toString('hex');
     const backendId = crypto.randomBytes(20).toString('hex');
+
+    /* Track messages sent as deep research from within chat mode */
+    if (overrideChatMode === 'research' && chatMode === 'chat') {
+      setResearchOnlyMessageIds((prev) => [...prev, messageId!]);
+    }
 
     const newMessage: Message = {
       messageId,
@@ -769,7 +780,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         files: fileIds,
         sources: sources,
         optimizationMode: optimizationMode,
-        chatMode: chatMode,
+        chatMode: overrideChatMode ?? chatMode,
         sessionMcpConfig: sessionMcpConfig,
         history: rewrite
           ? chatHistory.current.slice(
@@ -838,6 +849,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         optimizationMode,
         chatMode,
         sessionMcpConfig,
+        researchOnlyMessageIds,
         setFileIds,
         setFiles,
         setSources,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Settings2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChat } from '@/lib/hooks/useChat';
@@ -13,15 +13,16 @@ type ToolEntry = {
 };
 
 /**
- * Panel showing all available MCP/research tools for this session.
- * Users can toggle individual tools on/off; changes apply immediately
- * to the next message in the current session only.
+ * Panel showing all available MCP/research tools for this session, grouped
+ * by provider.  Users can toggle individual tools on/off; changes apply
+ * immediately to the next message in the current session only.
  */
 const SessionToolPanel = () => {
   const { sessionMcpConfig, setSessionMcpConfig } = useChat();
   const [open, setOpen] = useState(false);
   const [tools, setTools] = useState<ToolEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +48,29 @@ const SessionToolPanel = () => {
   const isEnabled = (toolName: string) => !disabledTools.includes(toolName);
 
   const activeDisabledCount = disabledTools.length;
+
+  /** Group tools by their server/provider */
+  const toolGroups = useMemo(() => {
+    const groups: Record<string, ToolEntry[]> = {};
+    for (const tool of tools) {
+      const key = tool.server ?? 'built-in';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(tool);
+    }
+    return Object.entries(groups);
+  }, [tools]);
+
+  const toggleGroupCollapse = (groupName: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="relative">
@@ -76,14 +100,14 @@ const SessionToolPanel = () => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
-            className="absolute bottom-full mb-2 left-0 z-50 w-72 bg-light-primary dark:bg-dark-primary border border-light-200 dark:border-dark-200 rounded-xl shadow-lg p-3"
+            className="absolute bottom-full mb-2 left-0 z-50 w-80 bg-light-primary dark:bg-dark-primary border border-light-200 dark:border-dark-200 rounded-xl shadow-lg p-3"
           >
-            <p className="text-xs font-semibold text-black dark:text-white mb-2">
+            <p className="text-xs font-semibold text-black dark:text-white mb-1">
               Session Tools
             </p>
             <p className="text-[11px] text-black/50 dark:text-white/50 mb-3 leading-relaxed">
-              Toggle tools on/off for this session only. Changes take effect on
-              the next message.
+              Toggle tools on/off for this session. Changes take effect on the
+              next message.
             </p>
 
             {loading && (
@@ -94,45 +118,77 @@ const SessionToolPanel = () => {
 
             {!loading && tools.length === 0 && (
               <p className="text-xs text-black/40 dark:text-white/40 py-2 text-center">
-                No MCP tools configured.
+                No tools available.
               </p>
             )}
 
-            <div className="flex flex-col space-y-1 max-h-52 overflow-y-auto">
-              {tools.map((tool) => (
-                <button
-                  key={tool.name}
-                  type="button"
-                  onClick={() => toggleTool(tool.name)}
-                  className={cn(
-                    'flex items-center justify-between w-full px-2.5 py-2 rounded-lg text-left transition-colors duration-100',
-                    isEnabled(tool.name)
-                      ? 'bg-light-secondary dark:bg-dark-secondary hover:bg-light-200 dark:hover:bg-dark-200'
-                      : 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30',
-                  )}
-                >
-                  <div className="flex flex-col flex-1 min-w-0 pr-2">
-                    <span className="text-xs font-medium text-black dark:text-white truncate">
-                      {tool.name}
-                      {tool.server && (
-                        <span className="ml-1 text-[10px] text-black/40 dark:text-white/40 font-normal">
-                          [{tool.server}]
-                        </span>
-                      )}
-                    </span>
-                    {tool.description && (
-                      <span className="text-[10px] text-black/50 dark:text-white/50 line-clamp-1 mt-0.5">
-                        {tool.description}
+            <div className="flex flex-col space-y-2 max-h-64 overflow-y-auto pr-1">
+              {toolGroups.map(([groupName, groupTools]) => {
+                const isCollapsed = collapsedGroups.has(groupName);
+                const groupDisabledCount = groupTools.filter(
+                  (t) => !isEnabled(t.name),
+                ).length;
+
+                return (
+                  <div key={groupName}>
+                    {/* Group header */}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupCollapse(groupName)}
+                      className="flex items-center justify-between w-full py-1 px-1"
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
+                        {groupName}
+                        {groupDisabledCount > 0 && (
+                          <span className="ml-1 text-amber-500">
+                            ({groupDisabledCount} off)
+                          </span>
+                        )}
                       </span>
+                      {isCollapsed ? (
+                        <ChevronDown size={10} className="text-black/30 dark:text-white/30" />
+                      ) : (
+                        <ChevronUp size={10} className="text-black/30 dark:text-white/30" />
+                      )}
+                    </button>
+
+                    {/* Group tools */}
+                    {!isCollapsed && (
+                      <div className="flex flex-col space-y-0.5">
+                        {groupTools.map((tool) => (
+                          <button
+                            key={tool.name}
+                            type="button"
+                            onClick={() => toggleTool(tool.name)}
+                            className={cn(
+                              'flex items-center justify-between w-full px-2.5 py-2 rounded-lg text-left transition-colors duration-100',
+                              isEnabled(tool.name)
+                                ? 'bg-light-secondary dark:bg-dark-secondary hover:bg-light-200 dark:hover:bg-dark-200'
+                                : 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30',
+                            )}
+                          >
+                            <div className="flex flex-col flex-1 min-w-0 pr-2">
+                              <span className="text-xs font-medium text-black dark:text-white truncate">
+                                {tool.name}
+                              </span>
+                              {tool.description && (
+                                <span className="text-[10px] text-black/50 dark:text-white/50 line-clamp-1 mt-0.5">
+                                  {tool.description}
+                                </span>
+                              )}
+                            </div>
+                            {isEnabled(tool.name) ? (
+                              <ToggleRight size={18} className="text-sky-500 flex-shrink-0" />
+                            ) : (
+                              <ToggleLeft size={18} className="text-black/30 dark:text-white/30 flex-shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {isEnabled(tool.name) ? (
-                    <ToggleRight size={18} className="text-sky-500 flex-shrink-0" />
-                  ) : (
-                    <ToggleLeft size={18} className="text-black/30 dark:text-white/30 flex-shrink-0" />
-                  )}
-                </button>
-              ))}
+                );
+              })}
             </div>
 
             {disabledTools.length > 0 && (
