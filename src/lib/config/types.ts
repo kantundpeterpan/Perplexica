@@ -60,6 +60,42 @@ type ConfigModelProvider = {
   hash: string;
 };
 
+type MCPToolScope = 'allow' | 'ask' | 'disabled';
+
+type MCPToolOverride = {
+  name: string;
+  scope: MCPToolScope;
+};
+
+type MCPServerTransportStdio = {
+  type: 'stdio';
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+};
+
+type MCPServerTransportHttp = {
+  type: 'http';
+  url: string;
+  headers?: Record<string, string>;
+};
+
+type MCPServerTransport = MCPServerTransportStdio | MCPServerTransportHttp;
+
+type MCPServerConfig = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  defaultScope: MCPToolScope;
+  toolOverrides: MCPToolOverride[];
+  systemPromptSnippet?: string;
+  transport: MCPServerTransport;
+};
+
+type MCPConfig = {
+  servers: MCPServerConfig[];
+};
+
 type Config = {
   version: number;
   setupComplete: boolean;
@@ -73,6 +109,7 @@ type Config = {
   search: {
     [key: string]: any;
   };
+  mcp: MCPConfig;
 };
 
 type EnvMap = {
@@ -93,6 +130,7 @@ type UIConfigSections = {
   personalization: UIConfigField[];
   modelProviders: ModelProviderUISection[];
   search: UIConfigField[];
+  mcp: UIConfigField[];
 };
 
 export type {
@@ -106,4 +144,11 @@ export type {
   ConfigModelProvider,
   TextareaUIConfigField,
   SwitchUIConfigField,
+  MCPConfig,
+  MCPServerConfig,
+  MCPServerTransport,
+  MCPServerTransportStdio,
+  MCPServerTransportHttp,
+  MCPToolScope,
+  MCPToolOverride,
 };

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'fs';
-import { Config, ConfigModelProvider, UIConfigSections } from './types';
+import { Config, ConfigModelProvider, MCPServerConfig, MCPServerTransport, MCPToolScope, UIConfigSections } from './types';
 import { hashObj } from '../serverUtils';
 import { getModelProvidersUIConfigSection } from '../models/providers';
 
@@ -18,6 +18,9 @@ class ConfigManager {
     modelProviders: [],
     search: {
       searxngURL: '',
+    },
+    mcp: {
+      servers: [],
     },
   };
   uiConfigSections: UIConfigSections = {
@@ -99,6 +102,17 @@ class ConfigManager {
           'e.g., "Respond in a friendly and concise tone" or "Use British English and format answers as bullet points."',
         scope: 'client',
       },
+      {
+        name: 'Chat Mode System Prompt',
+        key: 'chatSystemPrompt',
+        type: 'textarea',
+        required: false,
+        description:
+          'Override the default system prompt used in Chat mode. Leave blank to use the built-in chat prompt.',
+        placeholder:
+          'e.g., "You are a helpful coding assistant. Be concise."',
+        scope: 'client',
+      },
     ],
     modelProviders: [],
     search: [
@@ -114,6 +128,7 @@ class ConfigManager {
         env: 'SEARXNG_API_URL',
       },
     ],
+    mcp: [],
   };
 
   constructor() {
@@ -233,6 +248,11 @@ class ConfigManager {
           process.env[f.env] ?? f.default ?? '';
       }
     });
+
+    /* mcp section - ensure the servers array exists (migrate from old flat config) */
+    if (!this.currentConfig.mcp || !Array.isArray(this.currentConfig.mcp.servers)) {
+      this.currentConfig.mcp = { servers: [] };
+    }
 
     this.saveConfig();
   }
@@ -362,6 +382,66 @@ class ConfigManager {
     }
 
     this.saveConfig();
+  }
+
+  public addMCPServer(
+    name: string,
+    transport: MCPServerTransport,
+    defaultScope: MCPToolScope = 'allow',
+    systemPromptSnippet?: string,
+  ): MCPServerConfig {
+    const server: MCPServerConfig = {
+      id: crypto.randomUUID(),
+      name,
+      enabled: true,
+      defaultScope,
+      toolOverrides: [],
+      ...(systemPromptSnippet ? { systemPromptSnippet } : {}),
+      transport,
+    };
+
+    this.currentConfig.mcp.servers.push(server);
+    this.saveConfig();
+
+    return server;
+  }
+
+  public updateMCPServer(
+    id: string,
+    updates: Partial<
+      Pick<
+        MCPServerConfig,
+        | 'name'
+        | 'enabled'
+        | 'defaultScope'
+        | 'transport'
+        | 'toolOverrides'
+        | 'systemPromptSnippet'
+      >
+    >,
+  ): MCPServerConfig {
+    const server = this.currentConfig.mcp.servers.find((s) => s.id === id);
+    if (!server) throw new Error(`MCP server ${id} not found`);
+
+    Object.assign(server, updates);
+    this.saveConfig();
+
+    return server;
+  }
+
+  public removeMCPServer(id: string) {
+    this.currentConfig.mcp.servers = this.currentConfig.mcp.servers.filter(
+      (s) => s.id !== id,
+    );
+    this.saveConfig();
+  }
+
+  public getActiveMCPPromptSnippets(): string[] {
+    return this.currentConfig.mcp.servers
+      .filter((s): s is typeof s & { systemPromptSnippet: string } =>
+        s.enabled === true && typeof s.systemPromptSnippet === 'string' && s.systemPromptSnippet.length > 0,
+      )
+      .map((s) => s.systemPromptSnippet);
   }
 
   public isSetupComplete() {

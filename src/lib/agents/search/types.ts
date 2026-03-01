@@ -6,6 +6,38 @@ import { ChatTurnMessage, Chunk } from '@/lib/types';
 
 export type SearchSources = 'web' | 'discussions' | 'academic';
 
+/**
+ * Per-session SearxNG configuration.
+ * When provided, these values override the global SearxNG settings for the
+ * current chat session only.
+ */
+export type SearxngSessionConfig = {
+  /** SearxNG instance base URL (e.g. "http://localhost:8888"). */
+  instanceUrl?: string;
+  /** Request timeout in milliseconds. */
+  timeout?: number;
+  /** Maximum number of results to return. */
+  maxResults?: number;
+  /** Safe-search level: 0 = off, 1 = moderate, 2 = strict. */
+  safeSearch?: 0 | 1 | 2;
+};
+
+/**
+ * Session-scoped MCP tool configuration.
+ * Allows per-session overrides of which tools are enabled and how they are
+ * configured, without affecting the global/default tool settings.
+ */
+export type SessionMcpConfig = {
+  /**
+   * Names of tools that should be disabled for this session.
+   * Tool names match the `name` field on each `ResearchAction` / MCP tool
+   * (e.g. `"web_search"`, `"academic_search"`).
+   */
+  disabledTools?: string[];
+  /** Per-session SearxNG settings. */
+  searxng?: SearxngSessionConfig;
+};
+
 export type SearchAgentConfig = {
   sources: SearchSources[];
   fileIds: string[];
@@ -13,6 +45,14 @@ export type SearchAgentConfig = {
   embedding: BaseEmbedding<any>;
   mode: 'speed' | 'balanced' | 'quality';
   systemInstructions: string;
+  /** When set to `'chat'` the agent responds conversationally.
+   *  Defaults to `'research'` (existing behaviour). */
+  chatMode?: 'chat' | 'research';
+  /** Custom system prompt for chat mode. Overrides the built-in chat prompt
+   *  when provided. Configurable via Settings → Personalization. */
+  chatSystemPrompt?: string;
+  /** Session-level MCP tool overrides.  Takes precedence over global config. */
+  sessionMcpConfig?: SessionMcpConfig;
 };
 
 export type SearchAgentInput = {
@@ -66,6 +106,8 @@ export type AdditionalConfig = {
   llm: BaseLLM<any>;
   embedding: BaseEmbedding<any>;
   session: SessionManager;
+  /** Session-level MCP tool overrides forwarded to tool `execute()` calls. */
+  sessionMcpConfig?: SessionMcpConfig;
 };
 
 export type ResearcherInput = {

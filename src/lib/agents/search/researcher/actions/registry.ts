@@ -10,9 +10,18 @@ import {
 
 class ActionRegistry {
   private static actions: Map<string, ResearchAction> = new Map();
+  private static readyPromise: Promise<void> = Promise.resolve();
 
   static register(action: ResearchAction<any>) {
     this.actions.set(action.name, action);
+  }
+
+  static setReadyPromise(promise: Promise<void>) {
+    this.readyPromise = promise;
+  }
+
+  static waitForReady(): Promise<void> {
+    return this.readyPromise;
   }
 
   static get(name: string): ResearchAction | undefined {
@@ -24,9 +33,14 @@ class ActionRegistry {
     fileIds: string[];
     mode: SearchAgentConfig['mode'];
     sources: SearchSources[];
+    disabledTools?: string[];
   }): ResearchAction[] {
     return Array.from(
-      this.actions.values().filter((action) => action.enabled(config)),
+      this.actions.values().filter(
+        (action) =>
+          action.enabled(config) &&
+          !(config.disabledTools ?? []).includes(action.name),
+      ),
     );
   }
 
@@ -35,6 +49,7 @@ class ActionRegistry {
     fileIds: string[];
     mode: SearchAgentConfig['mode'];
     sources: SearchSources[];
+    disabledTools?: string[];
   }): Tool[] {
     const availableActions = this.getAvailableActions(config);
 
@@ -50,6 +65,7 @@ class ActionRegistry {
     fileIds: string[];
     mode: SearchAgentConfig['mode'];
     sources: SearchSources[];
+    disabledTools?: string[];
   }): string {
     const availableActions = this.getAvailableActions(config);
 

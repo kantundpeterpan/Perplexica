@@ -15,6 +15,11 @@ class SessionManager {
   private events: { event: string; data: any }[] = [];
   private emitter = new EventEmitter();
   private TTL_MS = 30 * 60 * 1000;
+  private approvalResolvers = new Map<
+    string,
+    (result: { approved: boolean; steering?: string }) => void
+  >();
+  private approvalTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(id?: string) {
     this.id = id ?? crypto.randomUUID();
@@ -75,6 +80,59 @@ class SessionManager {
 
   getAllBlocks() {
     return Array.from(this.blocks.values());
+  }
+
+  /**
+   * Pause execution until the user approves or denies an MCP tool call.
+   * Resolves with `{ approved, steering? }` when the user responds via
+   * POST /api/mcp/approval/[blockId].  Times out after `timeoutMs` with
+   * `{ approved: false }` to prevent indefinite hangs.
+   */
+  waitForApproval(
+    blockId: string,
+    timeoutMs = 10 * 60 * 1000,
+  ): Promise<{ approved: boolean; steering?: string }> {
+    return new Promise((resolve) => {
+      this.approvalResolvers.set(blockId, resolve);
+      const timer = setTimeout(() => {
+        if (this.approvalResolvers.has(blockId)) {
+          this.approvalResolvers.delete(blockId);
+          this.approvalTimers.delete(blockId);
+          this.updateBlock(blockId, [
+            { op: 'replace', path: '/data/status', value: 'denied' },
+          ]);
+          resolve({ approved: false });
+        }
+      }, timeoutMs);
+      this.approvalTimers.set(blockId, timer);
+    });
+  }
+
+  resolveApproval(
+    blockId: string,
+    result: { approved: boolean; steering?: string },
+  ) {
+    const resolver = this.approvalResolvers.get(blockId);
+    if (resolver) {
+      this.approvalResolvers.delete(blockId);
+      const timer = this.approvalTimers.get(blockId);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        this.approvalTimers.delete(blockId);
+      }
+      const patches: any[] = [
+        {
+          op: 'replace',
+          path: '/data/status',
+          value: result.approved ? 'approved' : 'denied',
+        },
+      ];
+      if (result.steering) {
+        patches.push({ op: 'add', path: '/data/steering', value: result.steering });
+      }
+      this.updateBlock(blockId, patches);
+      resolver(result);
+    }
   }
 
   subscribe(listener: (event: string, data: any) => void): () => void {
