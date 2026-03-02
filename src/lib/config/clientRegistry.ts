@@ -24,6 +24,11 @@ export const getCodeCellTruncateLines = (): number => {
   return isNaN(parsed) || parsed < 1 ? 10 : parsed;
 };
 
+export const getCodePanelWidth = (): string => {
+  const val = getClientConfig('codePanelWidth', '6');
+  return ['4', '5', '6', '7'].includes(val) ? val : '6';
+};
+
 export const getMeasurementUnit = () => {
   const value =
     getClientConfig('measureUnit') ??

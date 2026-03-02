@@ -107,6 +107,22 @@ class ConfigManager {
         default: '10',
         scope: 'client',
       },
+      {
+        name: 'Code panel width',
+        key: 'codePanelWidth',
+        type: 'select',
+        options: [
+          { name: 'Narrow (4/12)', value: '4' },
+          { name: 'Standard (5/12)', value: '5' },
+          { name: 'Wide (6/12)', value: '6' },
+          { name: 'Wider (7/12)', value: '7' },
+        ],
+        required: false,
+        description:
+          'Width of the code panel relative to the conversation. Higher values give the panel more space.',
+        default: '6',
+        scope: 'client',
+      },
     ],
     personalization: [
       {

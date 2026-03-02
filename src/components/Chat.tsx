@@ -65,7 +65,7 @@ const Chat = () => {
     <div
       className={cn(
         'flex flex-col space-y-6 pt-8 pb-44 lg:pb-28',
-        hasCells ? 'sm:mx-2 md:mx-4' : 'sm:mx-4 md:mx-8',
+        hasCells ? 'sm:mx-0 md:mx-0' : 'sm:mx-4 md:mx-8',
       )}
     >
       {sections.map((section, i) => {

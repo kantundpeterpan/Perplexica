@@ -210,22 +210,26 @@ const SingleCodeCell = ({
 
 const CodeCellPanel = ({
   codeCells,
-  activeCellIndex,
-  onCellActivate,
+  activeCellRequest,
 }: {
   codeCells: CodeCell[];
-  activeCellIndex?: number;
-  onCellActivate?: (index: number) => void;
+  activeCellRequest?: { index: number; rev: number };
 }) => {
   const [executionAcknowledged, setExecutionAcknowledged] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const panelRef = React.useRef<HTMLDivElement>(null);
 
-  // Sync external activation (e.g. clicking a truncated inline block)
+  // Sync external activation (e.g. clicking a truncated inline block).
+  // The rev counter ensures clicking the same cell multiple times still fires.
   useEffect(() => {
-    if (activeCellIndex !== undefined && activeCellIndex < codeCells.length) {
-      setActiveTab(activeCellIndex);
+    if (
+      activeCellRequest !== undefined &&
+      activeCellRequest.index < codeCells.length
+    ) {
+      setActiveTab(activeCellRequest.index);
+      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [activeCellIndex, codeCells.length]);
+  }, [activeCellRequest, codeCells.length]);
 
   // When a new cell is streamed in, auto-select the latest tab
   // Initialized with current length so the effect only fires for *new* cells
@@ -244,11 +248,10 @@ const CodeCellPanel = ({
 
   const handleTabClick = (i: number) => {
     setActiveTab(i);
-    onCellActivate?.(i);
   };
 
   return (
-    <div className="flex flex-col w-full rounded-xl border border-light-200 dark:border-dark-200 overflow-hidden">
+    <div ref={panelRef} className="flex flex-col w-full rounded-xl border border-light-200 dark:border-dark-200 overflow-hidden">
       {/* Panel header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-light-secondary dark:bg-dark-secondary border-b border-light-200 dark:border-dark-200 flex-shrink-0">
         <TerminalIcon size={14} className="text-black/60 dark:text-white/60" />

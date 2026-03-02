@@ -29,9 +29,17 @@ import CodeBlock from './MessageRenderer/CodeBlock';
 import MCPApprovalWidget from './MCPApprovalWidget';
 import CodeCellPanel from './CodeCellPanel';
 import { MCPApprovalBlock, ResearchBlock } from '@/lib/types';
-import { getCodeCellTruncateLines } from '@/lib/config/clientRegistry';
+import { getCodeCellTruncateLines, getCodePanelWidth } from '@/lib/config/clientRegistry';
 
 const DEFAULT_TRUNCATE_LINES = 10;
+
+/** Maps the codePanelWidth setting to Tailwind column classes. */
+const PANEL_WIDTH_CLASSES: Record<string, { panel: string; conversation: string }> = {
+  '4': { panel: 'lg:w-4/12', conversation: 'lg:w-8/12' },
+  '5': { panel: 'lg:w-5/12', conversation: 'lg:w-7/12' },
+  '6': { panel: 'lg:w-6/12', conversation: 'lg:w-6/12' },
+  '7': { panel: 'lg:w-7/12', conversation: 'lg:w-5/12' },
+};
 
 const ThinkTagProcessor = ({
   children,
@@ -82,9 +90,12 @@ const MessageBox = ({
 
   const { speechStatus, start, stop } = useSpeech({ text: speechMessage });
 
-  const [activeCellIndex, setActiveCellIndex] = useState<number | undefined>(
-    undefined,
-  );
+  const [activeCellRequest, setActiveCellRequest] = useState<
+    { index: number; rev: number } | undefined
+  >(undefined);
+
+  const handleCellActivate = (index: number) =>
+    setActiveCellRequest((prev) => ({ index, rev: (prev?.rev ?? 0) + 1 }));
 
   // Configurable truncation threshold (reads from localStorage, reacts to settings changes)
   const [truncateLines, setTruncateLines] = useState<number>(() =>
@@ -93,8 +104,15 @@ const MessageBox = ({
       : DEFAULT_TRUNCATE_LINES,
   );
 
+  const [codePanelWidth, setCodePanelWidth] = useState<string>(() =>
+    typeof window !== 'undefined' ? getCodePanelWidth() : '6',
+  );
+
   useEffect(() => {
-    const update = () => setTruncateLines(getCodeCellTruncateLines());
+    const update = () => {
+      setTruncateLines(getCodeCellTruncateLines());
+      setCodePanelWidth(getCodePanelWidth());
+    };
     update();
     window.addEventListener('client-config-changed', update);
     window.addEventListener('storage', update);
@@ -131,7 +149,7 @@ const MessageBox = ({
                 <div className="absolute bottom-0 left-0 right-0 h-14 bg-gradient-to-t from-white dark:from-[#0d1117] to-transparent pointer-events-none" />
               </div>
               <button
-                onClick={() => setActiveCellIndex(cellIndex)}
+                onClick={() => handleCellActivate(cellIndex)}
                 className="mt-1 flex items-center gap-1 text-xs text-[#24A0ED] hover:underline"
               >
                 <span>
@@ -144,9 +162,18 @@ const MessageBox = ({
         }
 
         return (
-          <CodeBlock key={state.key} language={node.lang || ''}>
-            {code}
-          </CodeBlock>
+          <div key={state.key} className="my-2">
+            <CodeBlock language={node.lang || ''}>{code}</CodeBlock>
+            {hasCells && (
+              <button
+                onClick={() => handleCellActivate(cellIndex)}
+                className="mt-1 flex items-center gap-1 text-xs text-[#24A0ED]/60 hover:text-[#24A0ED] hover:underline transition-colors"
+              >
+                <span>view in panel</span>
+                <ArrowRightIcon size={11} />
+              </button>
+            )}
+          </div>
         );
       }
 
@@ -164,6 +191,8 @@ const MessageBox = ({
       },
     },
   };
+
+  const widthClasses = PANEL_WIDTH_CLASSES[codePanelWidth] ?? PANEL_WIDTH_CLASSES['6'];
 
   return (
     <div className="space-y-6">
@@ -183,7 +212,7 @@ const MessageBox = ({
           ref={dividerRef}
           className={cn(
             'flex flex-col space-y-6 w-full',
-            hasCells ? 'lg:w-7/12' : 'lg:w-9/12',
+            hasCells ? widthClasses.conversation : 'lg:w-9/12',
           )}
         >
           {sources.length > 0 && (
@@ -352,15 +381,14 @@ const MessageBox = ({
           <div
             className={cn(
               'lg:sticky lg:top-20 flex flex-col items-center space-y-3 w-full z-30 h-full pb-4',
-              hasCells ? 'lg:w-5/12' : 'lg:w-3/12',
+              hasCells ? widthClasses.panel : 'lg:w-3/12',
             )}
           >
             {hasCells && (
               <div className="w-full">
                 <CodeCellPanel
                   codeCells={section.codeCells}
-                  activeCellIndex={activeCellIndex}
-                  onCellActivate={setActiveCellIndex}
+                  activeCellRequest={activeCellRequest}
                 />
               </div>
             )}
