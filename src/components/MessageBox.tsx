@@ -1,7 +1,7 @@
 'use client';
 
 /* eslint-disable @next/next/no-img-element */
-import React, { MutableRefObject } from 'react';
+import React, { MutableRefObject, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   BookCopy,
@@ -11,6 +11,7 @@ import {
   Layers3,
   Plus,
   CornerDownRight,
+  ArrowRightIcon,
 } from 'lucide-react';
 import Markdown, { MarkdownToJSX, RuleType } from 'markdown-to-jsx';
 import Copy from './MessageActions/Copy';
@@ -23,9 +24,22 @@ import ThinkBox from './ThinkBox';
 import { useChat, Section } from '@/lib/hooks/useChat';
 import Citation from './MessageRenderer/Citation';
 import AssistantSteps from './AssistantSteps';
-import { ResearchBlock } from '@/lib/types';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
+import MCPApprovalWidget from './MCPApprovalWidget';
+import CodeCellPanel from './CodeCellPanel';
+import { MCPApprovalBlock, ResearchBlock } from '@/lib/types';
+import { getCodeCellTruncateLines, getCodePanelWidth } from '@/lib/config/clientRegistry';
+
+const DEFAULT_TRUNCATE_LINES = 10;
+
+/** Maps the codePanelWidth setting to Tailwind column classes. */
+const PANEL_WIDTH_CLASSES: Record<string, { panel: string; conversation: string }> = {
+  '4': { panel: 'lg:w-4/12', conversation: 'lg:w-8/12' },
+  '5': { panel: 'lg:w-5/12', conversation: 'lg:w-7/12' },
+  '6': { panel: 'lg:w-6/12', conversation: 'lg:w-6/12' },
+  '7': { panel: 'lg:w-7/12', conversation: 'lg:w-5/12' },
+};
 
 const ThinkTagProcessor = ({
   children,
@@ -57,6 +71,7 @@ const MessageBox = ({
     messages,
     researchEnded,
     chatHistory,
+    chatMode,
   } = useChat();
 
   const parsedMessage = section.parsedTextBlocks.join('\n\n');
@@ -71,8 +86,47 @@ const MessageBox = ({
   const sources = sourceBlocks.flatMap((block) => block.data);
 
   const hasContent = section.parsedTextBlocks.length > 0;
+  const hasCells = section.codeCells.length > 0;
 
   const { speechStatus, start, stop } = useSpeech({ text: speechMessage });
+
+  const [activeCellRequest, setActiveCellRequest] = useState<
+    { index: number; rev: number } | undefined
+  >(undefined);
+
+  const handleCellActivate = (index: number) =>
+    setActiveCellRequest((prev) => ({ index, rev: (prev?.rev ?? 0) + 1 }));
+
+  // Configurable truncation threshold (reads from localStorage, reacts to settings changes)
+  const [truncateLines, setTruncateLines] = useState<number>(() =>
+    typeof window !== 'undefined'
+      ? getCodeCellTruncateLines()
+      : DEFAULT_TRUNCATE_LINES,
+  );
+
+  const [codePanelWidth, setCodePanelWidth] = useState<string>(() =>
+    typeof window !== 'undefined' ? getCodePanelWidth() : '6',
+  );
+
+  useEffect(() => {
+    const update = () => {
+      setTruncateLines(getCodeCellTruncateLines());
+      setCodePanelWidth(getCodePanelWidth());
+    };
+    update();
+    window.addEventListener('client-config-changed', update);
+    window.addEventListener('storage', update);
+    return () => {
+      window.removeEventListener('client-config-changed', update);
+      window.removeEventListener('storage', update);
+    };
+  }, []);
+
+  // Counter that correlates inline code blocks with code panel cells.
+  // `renderRule` is called synchronously by markdown-to-jsx during React's
+  // render phase, so incrementing a plain `let` variable here is safe and
+  // always maps to the correct cell index.
+  let inlineCellIdx = 0;
 
   const markdownOverrides: MarkdownToJSX.Options = {
     renderRule(next, node, renderChildren, state) {
@@ -81,10 +135,45 @@ const MessageBox = ({
       }
 
       if (node.type === RuleType.codeBlock) {
+        const cellIndex = inlineCellIdx++;
+        const code: string = node.text;
+        const lines = code.split('\n');
+
+        if (lines.length > truncateLines) {
+          const preview = lines.slice(0, truncateLines).join('\n');
+          return (
+            <div key={state.key} className="relative my-2">
+              <div className="relative overflow-hidden">
+                <CodeBlock language={node.lang || ''}>{preview}</CodeBlock>
+                {/* Fade-out gradient overlay */}
+                <div className="absolute bottom-0 left-0 right-0 h-14 bg-gradient-to-t from-white dark:from-[#0d1117] to-transparent pointer-events-none" />
+              </div>
+              <button
+                onClick={() => handleCellActivate(cellIndex)}
+                className="mt-1 flex items-center gap-1 text-xs text-[#24A0ED] hover:underline"
+              >
+                <span>
+                  {lines.length} lines — view full code in panel
+                </span>
+                <ArrowRightIcon size={11} />
+              </button>
+            </div>
+          );
+        }
+
         return (
-          <CodeBlock key={state.key} language={node.lang || ''}>
-            {node.text}
-          </CodeBlock>
+          <div key={state.key} className="my-2">
+            <CodeBlock language={node.lang || ''}>{code}</CodeBlock>
+            {hasCells && (
+              <button
+                onClick={() => handleCellActivate(cellIndex)}
+                className="mt-1 flex items-center gap-1 text-xs text-[#24A0ED]/60 hover:text-[#24A0ED] hover:underline transition-colors"
+              >
+                <span>view in panel</span>
+                <ArrowRightIcon size={11} />
+              </button>
+            )}
+          </div>
         );
       }
 
@@ -103,10 +192,17 @@ const MessageBox = ({
     },
   };
 
+  const widthClasses = PANEL_WIDTH_CLASSES[codePanelWidth] ?? PANEL_WIDTH_CLASSES['6'];
+
   return (
     <div className="space-y-6">
       <div className={'w-full pt-8 break-words'}>
-        <h2 className="text-black dark:text-white font-medium text-3xl lg:w-9/12">
+        <h2
+          className={cn(
+            'text-black dark:text-white font-medium text-3xl',
+            hasCells ? 'lg:w-full' : 'lg:w-9/12',
+          )}
+        >
           {section.message.query}
         </h2>
       </div>
@@ -114,7 +210,10 @@ const MessageBox = ({
       <div className="flex flex-col space-y-9 lg:space-y-0 lg:flex-row lg:justify-between lg:space-x-9">
         <div
           ref={dividerRef}
-          className="flex flex-col space-y-6 w-full lg:w-9/12"
+          className={cn(
+            'flex flex-col space-y-6 w-full',
+            hasCells ? widthClasses.conversation : 'lg:w-9/12',
+          )}
         >
           {sources.length > 0 && (
             <div className="flex flex-col space-y-2">
@@ -143,9 +242,19 @@ const MessageBox = ({
               </div>
             ))}
 
+          {section.message.responseBlocks
+            .filter(
+              (block): block is MCPApprovalBlock =>
+                block.type === 'mcp_approval',
+            )
+            .map((approvalBlock) => (
+              <MCPApprovalWidget key={approvalBlock.id} block={approvalBlock} />
+            ))}
+
           {isLast &&
             loading &&
             !researchEnded &&
+            chatMode !== 'chat' &&
             !section.message.responseBlocks.some(
               (b) => b.type === 'research' && b.data.subSteps.length > 0,
             ) && (
@@ -160,7 +269,7 @@ const MessageBox = ({
           {section.widgets.length > 0 && <Renderer widgets={section.widgets} />}
 
           <div className="flex flex-col space-y-2">
-            {sources.length > 0 && (
+            {sources.length > 0 && chatMode !== 'chat' && (
               <div className="flex flex-row items-center space-x-2">
                 <Disc3
                   className={cn(
@@ -268,8 +377,21 @@ const MessageBox = ({
           </div>
         </div>
 
-        {hasContent && (
-          <div className="lg:sticky lg:top-20 flex flex-col items-center space-y-3 w-full lg:w-3/12 z-30 h-full pb-4">
+        {(hasContent || hasCells) && (
+          <div
+            className={cn(
+              'lg:sticky lg:top-20 flex flex-col items-center space-y-3 w-full z-30 h-full pb-4',
+              hasCells ? widthClasses.panel : 'lg:w-3/12',
+            )}
+          >
+            {hasCells && (
+              <div className="w-full">
+                <CodeCellPanel
+                  codeCells={section.codeCells}
+                  activeCellRequest={activeCellRequest}
+                />
+              </div>
+            )}
             <SearchImages
               query={section.message.query}
               chatHistory={chatHistory}

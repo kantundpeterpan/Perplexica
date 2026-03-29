@@ -18,6 +18,13 @@ import { MinimalProvider } from '../models/types';
 import { getAutoMediaSearch } from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
+import { SessionMcpConfig } from '@/lib/agents/search/types';
+
+export type CodeCell = {
+  id: string;
+  language: string;
+  code: string;
+};
 
 export type Section = {
   message: Message;
@@ -26,6 +33,7 @@ export type Section = {
   speechMessage: string;
   thinkingEnded: boolean;
   suggestions?: string[];
+  codeCells: CodeCell[];
 };
 
 type ChatContext = {
@@ -37,6 +45,8 @@ type ChatContext = {
   sources: string[];
   chatId: string | undefined;
   optimizationMode: string;
+  chatMode: 'chat' | 'research';
+  sessionMcpConfig: SessionMcpConfig;
   isMessagesLoaded: boolean;
   loading: boolean;
   notFound: boolean;
@@ -48,6 +58,8 @@ type ChatContext = {
   researchEnded: boolean;
   setResearchEnded: (ended: boolean) => void;
   setOptimizationMode: (mode: string) => void;
+  setChatMode: (mode: 'chat' | 'research') => void;
+  setSessionMcpConfig: (config: SessionMcpConfig) => void;
   setSources: (sources: string[]) => void;
   setFiles: (files: File[]) => void;
   setFileIds: (fileIds: string[]) => void;
@@ -253,6 +265,8 @@ export const chatContext = createContext<ChatContext>({
   sections: [],
   notFound: false,
   optimizationMode: '',
+  chatMode: 'research',
+  sessionMcpConfig: {},
   chatModelProvider: { key: '', providerId: '' },
   embeddingModelProvider: { key: '', providerId: '' },
   researchEnded: false,
@@ -262,6 +276,8 @@ export const chatContext = createContext<ChatContext>({
   setFiles: () => {},
   setSources: () => {},
   setOptimizationMode: () => {},
+  setChatMode: () => {},
+  setSessionMcpConfig: () => {},
   setChatModelProvider: () => {},
   setEmbeddingModelProvider: () => {},
   setResearchEnded: () => {},
@@ -289,6 +305,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [sources, setSources] = useState<string[]>(['web']);
   const [optimizationMode, setOptimizationMode] = useState('speed');
+  const [chatMode, setChatMode] = useState<'chat' | 'research'>('research');
+  const [sessionMcpConfig, setSessionMcpConfig] = useState<SessionMcpConfig>({});
 
   const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
 
@@ -319,6 +337,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       let speechMessage = '';
       let thinkingEnded = false;
       let suggestions: string[] = [];
+      const codeCells: CodeCell[] = [];
 
       const sourceBlocks = msg.responseBlocks.filter(
         (block): block is Block & { type: 'source' } => block.type === 'source',
@@ -347,6 +366,21 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
           if (block.data.includes('</think>')) {
             thinkingEnded = true;
+          }
+
+          // Extract code cells from fenced code blocks
+          const codeFenceRe = /```(\w*)\n([\s\S]*?)```/g;
+          let fenceMatch: RegExpExecArray | null;
+          while ((fenceMatch = codeFenceRe.exec(block.data)) !== null) {
+            const language = fenceMatch[1].trim() || 'text';
+            const code = fenceMatch[2].trimEnd();
+            if (code) {
+              codeCells.push({
+                id: `${msg.messageId}-code-${codeCells.length}`,
+                language,
+                code,
+              });
+            }
           }
 
           if (sources.length > 0) {
@@ -388,6 +422,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           textBlocks.push(processedText);
         } else if (block.type === 'suggestion') {
           suggestions = block.data;
+        } else if (block.type === 'code_cell') {
+          codeCells.push({
+            id: block.id,
+            language: block.data.language,
+            code: block.data.code,
+          });
         }
       });
 
@@ -398,6 +438,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         thinkingEnded,
         suggestions,
         widgets: widgetBlocks,
+        codeCells,
       };
     });
   }, [messages]);
@@ -758,6 +799,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         files: fileIds,
         sources: sources,
         optimizationMode: optimizationMode,
+        chatMode: chatMode,
+        sessionMcpConfig: sessionMcpConfig,
         history: rewrite
           ? chatHistory.current.slice(
               0,
@@ -773,6 +816,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           providerId: embeddingModelProvider.providerId,
         },
         systemInstructions: localStorage.getItem('systemInstructions'),
+        chatSystemPrompt: localStorage.getItem('chatSystemPrompt') || undefined,
       }),
     });
 
@@ -822,10 +866,14 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         messageAppeared,
         notFound,
         optimizationMode,
+        chatMode,
+        sessionMcpConfig,
         setFileIds,
         setFiles,
         setSources,
         setOptimizationMode,
+        setChatMode,
+        setSessionMcpConfig,
         rewrite,
         sendMessage,
         setChatModelProvider,

@@ -115,9 +115,43 @@ export type ResearchBlock = {
   };
 };
 
+export type MCPApprovalBlock = {
+  id: string;
+  type: 'mcp_approval';
+  data: {
+    sessionId: string;
+    toolName: string;
+    serverName: string;
+    args: Record<string, any>;
+    reasoning?: string;
+    status: 'pending' | 'approved' | 'denied';
+    steering?: string;
+  };
+};
+
+export type CodeCellRun = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  timestamp: string;
+};
+
+export type CodeCellBlock = {
+  id: string;
+  type: 'code_cell';
+  data: {
+    language: string;
+    code: string;
+    label?: string;
+    runs: CodeCellRun[];
+  };
+};
+
 export type Block =
   | TextBlock
   | SourceBlock
   | SuggestionBlock
   | WidgetBlock
-  | ResearchBlock;
+  | ResearchBlock
+  | MCPApprovalBlock
+  | CodeCellBlock;

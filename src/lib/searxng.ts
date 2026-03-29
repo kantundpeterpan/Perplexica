@@ -5,6 +5,8 @@ interface SearxngSearchOptions {
   engines?: string[];
   language?: string;
   pageno?: number;
+  /** SearxNG safe-search level: 0 = off, 1 = moderate, 2 = strict. */
+  safesearch?: 0 | 1 | 2;
 }
 
 interface SearxngSearchResult {
@@ -21,8 +23,9 @@ interface SearxngSearchResult {
 export const searchSearxng = async (
   query: string,
   opts?: SearxngSearchOptions,
+  baseUrl?: string,
 ) => {
-  const searxngURL = getSearxngURL();
+  const searxngURL = baseUrl || getSearxngURL();
 
   const url = new URL(`${searxngURL}/search?format=json`);
   url.searchParams.append('q', query);

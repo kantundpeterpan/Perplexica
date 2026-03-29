@@ -3,6 +3,7 @@ import SessionManager from '@/lib/session';
 import { classify } from './classifier';
 import Researcher from './researcher';
 import { getWriterPrompt } from '@/lib/prompts/search/writer';
+import { getChatPrompt } from '@/lib/prompts/search/chat';
 import { WidgetExecutor } from './widgets';
 import db from '@/lib/db';
 import { chats, messages } from '@/lib/db/schema';
@@ -50,6 +51,85 @@ class SearchAgent {
         )
         .execute();
     }
+
+    // ── Chat mode: uses full tool pipeline but conversational writer ────────
+    if (input.config.chatMode === 'chat') {
+      const classification = await classify({
+        chatHistory: input.chatHistory,
+        enabledSources: input.config.sources,
+        query: input.followUp,
+        llm: input.config.llm,
+      });
+
+      let searchResults: ResearcherOutput | null = null;
+      if (!classification.classification.skipSearch) {
+        const researcher = new Researcher();
+        searchResults = await researcher.research(session, {
+          chatHistory: input.chatHistory,
+          followUp: input.followUp,
+          classification,
+          config: input.config,
+        });
+      }
+
+      session.emit('data', { type: 'researchComplete' });
+
+      const finalContext =
+        searchResults?.searchFindings
+          .map(
+            (f, index) =>
+              `<result index=${index + 1} title=${f.metadata.title}>${f.content}</result>`,
+          )
+          .join('\n') || '';
+
+      const chatSystemPrompt = getChatPrompt(
+        input.config.chatSystemPrompt || input.config.systemInstructions,
+        finalContext,
+      );
+      const answerStream = input.config.llm.streamText({
+        messages: [
+          { role: 'system', content: chatSystemPrompt },
+          ...input.chatHistory,
+          { role: 'user', content: input.followUp },
+        ],
+      });
+
+      let responseBlockId = '';
+      for await (const chunk of answerStream) {
+        if (!responseBlockId) {
+          const block: TextBlock = {
+            id: crypto.randomUUID(),
+            type: 'text',
+            data: chunk.contentChunk,
+          };
+          session.emitBlock(block);
+          responseBlockId = block.id;
+        } else {
+          const block = session.getBlock(responseBlockId) as TextBlock | null;
+          if (!block) continue;
+          block.data += chunk.contentChunk;
+          session.updateBlock(block.id, [
+            { op: 'replace', path: '/data', value: block.data },
+          ]);
+        }
+      }
+
+      session.emit('end', {});
+
+      await db
+        .update(messages)
+        .set({ status: 'completed', responseBlocks: session.getAllBlocks() })
+        .where(
+          and(
+            eq(messages.chatId, input.chatId),
+            eq(messages.messageId, input.messageId),
+          ),
+        )
+        .execute();
+
+      return;
+    }
+    // ── Research mode (default) ────────────────────────────────────────────
 
     const classification = await classify({
       chatHistory: input.chatHistory,
